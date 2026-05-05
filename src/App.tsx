@@ -203,9 +203,11 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeCriterionIndex = allCriteria.findIndex(c => c.id === activeCriterion.id);
-  const totalMax = activeCriterion.subCriteria.reduce((acc, curr) => acc + curr.maxMarks, 0);
-  const totalAwarded = analyzedCriteria[activeCriterion.id] 
-    ? allCriteria[activeCriterionIndex].subCriteria.reduce((acc, curr) => acc + curr.awardedMarks, 0) 
+  const currentCriterion = activeCriterionIndex !== -1 ? allCriteria[activeCriterionIndex] : activeCriterion;
+  
+  const totalMax = currentCriterion.subCriteria.reduce((acc, curr) => acc + curr.maxMarks, 0);
+  const totalAwarded = analyzedCriteria[currentCriterion.id] 
+    ? currentCriterion.subCriteria.reduce((acc, curr) => acc + curr.awardedMarks, 0) 
     : 0;
   const progressPercent = totalMax > 0 ? Math.round((totalAwarded / totalMax) * 100) : 0;
   
@@ -553,7 +555,7 @@ export default function App() {
               <span className="text-lg font-bold text-blue-500">{progressPercent}%</span>
             </div>
             <div className="bg-white border border-slate-200 px-5 py-3 rounded-xl min-w-[140px] shadow-sm">
-              <span className="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Criterion Score</span>
+              <span className="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Strict Score</span>
               <span className="text-lg font-bold text-slate-900">
                 {totalAwarded} <span className="text-slate-300 text-sm font-normal">/ {totalMax}</span>
               </span>
@@ -646,7 +648,11 @@ export default function App() {
                             <td className="px-6 py-4 font-bold text-slate-400 group-hover:text-blue-500 transition-colors">{item.id}</td>
                             <td className="px-6 py-4 font-semibold text-slate-700">{item.name}</td>
                             <td className="px-6 py-4 text-center">
-                              <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md font-bold text-[10px]">
+                              <span className={`px-2 py-1 rounded-md font-bold text-[10px] ${
+                                analyzedCriteria[activeCriterion.id] && item.awardedMarks === 0 
+                                ? "bg-red-50 text-red-600 border border-red-100 shadow-[0_0_10px_rgba(220,38,38,0.1)]" 
+                                : "bg-blue-50 text-blue-700"
+                              }`}>
                                 {analyzedCriteria[activeCriterion.id] ? item.awardedMarks : 0}
                               </span>
                             </td>
