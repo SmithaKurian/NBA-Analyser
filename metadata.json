@@ -1,0 +1,6 @@
+{
+  "name": "NBA Expert Evaluator",
+  "description": "An expert evaluation tool for NBA accreditation, providing detailed criteria analysis, SAR document processing, and automated evaluation report generation with PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
