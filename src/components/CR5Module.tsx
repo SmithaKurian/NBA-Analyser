@@ -32,6 +32,33 @@ interface CR5ModuleProps {
     Cadre: number;
     Retention: number;
   }, hasFaculty?: boolean) => void;
+  // Hoisted states from App
+  cayFacultyList: FacultyEntry[];
+  setCayFacultyList: React.Dispatch<React.SetStateAction<FacultyEntry[]>>;
+  caym1FacultyList: FacultyEntry[];
+  setCaym1FacultyList: React.Dispatch<React.SetStateAction<FacultyEntry[]>>;
+  caym2FacultyList: FacultyEntry[];
+  setCaym2FacultyList: React.Dispatch<React.SetStateAction<FacultyEntry[]>>;
+  
+  calcCayFacultyList: FacultyEntry[];
+  setCalcCayFacultyList: React.Dispatch<React.SetStateAction<FacultyEntry[]>>;
+  calcCaym1FacultyList: FacultyEntry[];
+  setCalcCaym1FacultyList: React.Dispatch<React.SetStateAction<FacultyEntry[]>>;
+  calcCaym2FacultyList: FacultyEntry[];
+  setCalcCaym2FacultyList: React.Dispatch<React.SetStateAction<FacultyEntry[]>>;
+
+  cayUploadedFileName: string | null;
+  setCayUploadedFileName: (name: string | null) => void;
+  caym1UploadedFileName: string | null;
+  setCaym1UploadedFileName: (name: string | null) => void;
+  caym2UploadedFileName: string | null;
+  setCaym2UploadedFileName: (name: string | null) => void;
+
+  lastRecalculated: string | null;
+  setLastRecalculated: (val: string | null) => void;
+
+  isDirty: boolean;
+  setIsDirty: (val: boolean) => void;
 }
 
 const StatCard = ({ title, value, label, subtitle, color }: { title: string, value: string, label: string, subtitle?: string, color: string }) => (
@@ -45,29 +72,37 @@ const StatCard = ({ title, value, label, subtitle, color }: { title: string, val
   </div>
 );
 
-export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
+export function CR5Module({
+  onCalculateResults,
+  cayFacultyList,
+  setCayFacultyList,
+  caym1FacultyList,
+  setCaym1FacultyList,
+  caym2FacultyList,
+  setCaym2FacultyList,
+  calcCayFacultyList,
+  setCalcCayFacultyList,
+  calcCaym1FacultyList,
+  setCalcCaym1FacultyList,
+  calcCaym2FacultyList,
+  setCalcCaym2FacultyList,
+  cayUploadedFileName,
+  setCayUploadedFileName,
+  caym1UploadedFileName,
+  setCaym1UploadedFileName,
+  caym2UploadedFileName,
+  setCaym2UploadedFileName,
+  lastRecalculated,
+  setLastRecalculated,
+  isDirty,
+  setIsDirty
+}: CR5ModuleProps) {
   const [activeTab, setActiveTab] = useState('summary');
   const [searchQuery, setSearchQuery] = useState('');
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [isRecalculating, setIsRecalculating] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [lastRecalculated, setLastRecalculated] = useState<string | null>(null);
   const isInitialMount = useRef(true);
-
-  // 3 separate lists for CAY, CAYm1, CAYm2 (Represent user uploads)
-  const [cayFacultyList, setCayFacultyList] = useState<FacultyEntry[]>([]);
-  const [caym1FacultyList, setCaym1FacultyList] = useState<FacultyEntry[]>([]);
-  const [caym2FacultyList, setCaym2FacultyList] = useState<FacultyEntry[]>([]);
-
-  // 3 calculation lists that update only when clicking the "Recalculate" button
-  const [calcCayFacultyList, setCalcCayFacultyList] = useState<FacultyEntry[]>([]);
-  const [calcCaym1FacultyList, setCalcCaym1FacultyList] = useState<FacultyEntry[]>([]);
-  const [calcCaym2FacultyList, setCalcCaym2FacultyList] = useState<FacultyEntry[]>([]);
-
-  const [cayUploadedFileName, setCayUploadedFileName] = useState<string | null>(null);
-  const [caym1UploadedFileName, setCaym1UploadedFileName] = useState<string | null>(null);
-  const [caym2UploadedFileName, setCaym2UploadedFileName] = useState<string | null>(null);
 
   const [selectedDirectoryYear, setSelectedDirectoryYear] = useState<'cay' | 'caym1' | 'caym2'>('cay');
 
@@ -159,16 +194,18 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
         let colIdxs = {
           sn: 0,
           name: 1,
-          pan: 2,
-          degree: 3,
-          university: 4,
-          specialization: 5,
-          joiningDate: 6,
-          experience: 7,
-          joiningDesignation: 8,
-          presentDesignation: 9,
-          nature: 10,
-          currentlyAssociated: 11
+          pan: 3,
+          degree: 4,
+          university: 5,
+          specialization: 6,
+          joiningDate: 7,
+          experience: 8,
+          joiningDesignation: 9,
+          presentDesignation: 10,
+          dateDesignatedProf: 11,
+          nature: 12,
+          currentlyAssociated: 13,
+          dateOfLeaving: 14
         };
 
         for (let r = 0; r < Math.min(jsonData.length, 20); r++) {
@@ -184,7 +221,9 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
               rowStr.forEach((val, cIdx) => {
                 if (val.includes('sn') || val.includes('s.n') || val === 'sno' || val === 's.no' || val === 'serial') {
                   colIdxs.sn = cIdx;
-                } else if (val.includes('name') || val.includes('faculty') || val.includes('member') || val.includes('prof')) {
+                } else if (val.includes('date (designated') || val.includes('designated as prof') || (val.includes('designated') && val.includes('prof'))) {
+                  colIdxs.dateDesignatedProf = cIdx;
+                } else if (val.includes('name') || (val.includes('faculty') && !val.includes('designat') && !val.includes('joining') && !val.includes('leaving'))) {
                   colIdxs.name = cIdx;
                 } else if (val.includes('pan')) {
                   colIdxs.pan = cIdx;
@@ -194,11 +233,11 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
                   colIdxs.university = cIdx;
                 } else if (val.includes('spec') || val.includes('dept') || val.includes('branch') || val.includes('subject')) {
                   colIdxs.specialization = cIdx;
-                } else if (val.includes('joining date') || val.includes('doj')) {
+                } else if (val.includes('joining date') || val.includes('doj') || val.includes('date of joining')) {
                   colIdxs.joiningDate = cIdx;
                 } else if (val.includes('exp') || val.includes('year')) {
                   colIdxs.experience = cIdx;
-                } else if (val.includes('joining des') || val.includes('designation at joining')) {
+                } else if (val.includes('joining des') || val.includes('designation at joining') || val.includes('designation at time joining')) {
                   colIdxs.joiningDesignation = cIdx;
                 } else if (val.includes('present des') || val.includes('current des') || val.includes('present designation') || val.includes('current designation') || val.includes('role') || val.includes('designation')) {
                   colIdxs.presentDesignation = cIdx;
@@ -206,6 +245,8 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
                   colIdxs.nature = cIdx;
                 } else if (val.includes('currently') || val.includes('associated') || val.includes('active') || val.includes('yes/no') || val.includes('y/n')) {
                   colIdxs.currentlyAssociated = cIdx;
+                } else if (val.includes('leaving') || val.includes('date of leaving')) {
+                  colIdxs.dateOfLeaving = cIdx;
                 }
               });
               break;
@@ -220,6 +261,7 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
           .filter(row => row && row.length > 0 && row[colIdxs.name])
           .map((row, index) => {
             const getCellStr = (idx: number, def = '') => {
+              if (idx === undefined || idx < 0) return def;
               const val = row[idx];
               if (val === undefined || val === null) return def;
               return String(val).trim();
@@ -252,6 +294,8 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
               presentDesignation: getCellStr(colIdxs.presentDesignation, 'Assistant Professor'),
               nature: getCellStr(colIdxs.nature, 'Regular'),
               currentlyAssociated: curAssoc,
+              dateDesignatedProf: getCellStr(colIdxs.dateDesignatedProf),
+              dateOfLeaving: getCellStr(colIdxs.dateOfLeaving),
             };
           });
 
@@ -360,9 +404,91 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
 
   const downloadSample = () => {
     const data = [
-      ["SN", "Faculty Name", "PAN", "Degree", "University", "Specialization", "Joining Date", "Experience (Years)", "Joining Designation", "Present Designation", "Nature", "Currently Associated (Y/N)"],
-      [1, "Dr. John Doe", "ABCDE1234F", "Ph.D", "Anna University", "CSE", "2018-06-15", 8.5, "Assistant Professor", "Professor", "Regular", "Y"],
-      [2, "Jane Smith", "BCDEF2345G", "M.Tech", "VTU", "Software Engineering", "2021-01-10", 3.2, "Assistant Professor", "Assistant Professor", "Contract", "Y"]
+      [
+        "S.N",
+        "Name of the Faculty",
+        "", // Blank column as shown in the template
+        "PAN No.",
+        "Highest Degree",
+        "University",
+        "Area of Specialization",
+        "Date of Joining in this Institution",
+        "Experience in Years in current institute",
+        "Designation at Time Joining in this Institution",
+        "Present Designation",
+        "Date (Designated as Prof./ Associate Professor)",
+        "Nature of Association (Regular/Contract/Adjunct)",
+        "Currently Associated(Y/N)",
+        "Date of Leaving"
+      ],
+      [
+        1,
+        "Dr. John Doe",
+        "",
+        "ABCDE1234F",
+        "Ph.D",
+        "Anna University",
+        "Computer Science",
+        "2018-06-15",
+        8.5,
+        "Assistant Professor",
+        "Professor",
+        "2022-09-01",
+        "Regular",
+        "Y",
+        ""
+      ],
+      [
+        2,
+        "Jane Smith",
+        "",
+        "BCDEF2345G",
+        "M.Tech",
+        "VTU",
+        "Software Engineering",
+        "2021-01-10",
+        3.2,
+        "Assistant Professor",
+        "Assistant Professor",
+        "",
+        "Regular",
+        "Y",
+        ""
+      ],
+      [
+        3,
+        "Dr. Robert Lee",
+        "",
+        "CDEFG3456H",
+        "Ph.D",
+        "IIT Madras",
+        "Information Technology",
+        "2015-07-20",
+        11.0,
+        "Associate Professor",
+        "Associate Professor",
+        "2019-02-14",
+        "Regular",
+        "Y",
+        ""
+      ],
+      [
+        4,
+        "Sarah Jenkins",
+        "",
+        "DEFGH4567I",
+        "M.S.",
+        "BITS Pilani",
+        "Electronics & Communication",
+        "2024-08-01",
+        1.8,
+        "Assistant Professor",
+        "Assistant Professor",
+        "",
+        "Regular",
+        "N",
+        "2025-05-30"
+      ]
     ];
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -927,22 +1053,27 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
 
           <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
             <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Excel Import Mapping Specification</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-[10px] font-bold text-slate-500">
-              <div className="flex flex-col gap-1">
-                <span className="text-slate-700 font-bold uppercase tracking-tight">Column 1: Serial Number (SN)</span>
-                <span className="text-slate-700 font-bold uppercase tracking-tight">Column 2: Faculty Name</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-[10px] text-slate-500">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 1 / A: S.N</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 2 / B: Name of the Faculty</span>
+                <span className="text-slate-400 font-bold uppercase tracking-tight">Col 3 / C: (Blank / Spacer)</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 4 / D: PAN No.</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 5 / E: Highest Degree</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-slate-700 font-bold uppercase tracking-tight">Column 3: Permanent Account No / PAN</span>
-                <span className="text-slate-700 font-bold uppercase tracking-tight">Column 4: Highest Degree Earned</span>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 6 / F: University</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 7 / G: Area of Specialization</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 8 / H: Date of Joining in this Institution</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 9 / I: Experience in Years in current institute</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 10 / J: Designation at Time Joining in this Institution</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-slate-700 font-bold uppercase tracking-tight">Column 8: Total Experience (Years)</span>
-                <span className="text-slate-700 font-bold uppercase tracking-tight">Column 10: Current Designation</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-slate-700 font-bold uppercase tracking-tight">Column 11: Nature of Association</span>
-                <span className="text-slate-700 font-bold uppercase tracking-tight">Column 12: Associated Y/N</span>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 11 / K: Present Designation</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 12 / L: Date (Designated as Prof./ Associate Professor)</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 13 / M: Nature of Association (Regular/Contract/Adjunct)</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 14 / N: Currently Associated(Y/N)</span>
+                <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col 15 / O: Date of Leaving</span>
               </div>
             </div>
           </div>

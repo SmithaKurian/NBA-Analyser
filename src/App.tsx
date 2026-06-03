@@ -27,6 +27,7 @@ import { HistoryModal } from './components/HistoryModal';
 import { CR4Module } from './components/CR4Module';
 import { CR5Module } from './components/CR5Module';
 import { HISTORICAL_DATA, ALL_ACADEMIC_YEARS } from './utils';
+import { FacultyEntry } from './data';
 
 interface SubCriteria {
   id: string;
@@ -259,6 +260,22 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [c4ActiveTab, setC4ActiveTab] = useState<'analyzer' | 'calculator'>('analyzer');
   const [c5ActiveTab, setC5ActiveTab] = useState<'analyzer' | 'calculator'>('analyzer');
+
+  // Hoisted Criterion 5 states to prevent reset on tab change
+  const [cayFacultyList, setCayFacultyList] = useState<FacultyEntry[]>([]);
+  const [caym1FacultyList, setCaym1FacultyList] = useState<FacultyEntry[]>([]);
+  const [caym2FacultyList, setCaym2FacultyList] = useState<FacultyEntry[]>([]);
+  
+  const [calcCayFacultyList, setCalcCayFacultyList] = useState<FacultyEntry[]>([]);
+  const [calcCaym1FacultyList, setCalcCaym1FacultyList] = useState<FacultyEntry[]>([]);
+  const [calcCaym2FacultyList, setCalcCaym2FacultyList] = useState<FacultyEntry[]>([]);
+
+  const [cayUploadedFileName, setCayUploadedFileName] = useState<string | null>(null);
+  const [caym1UploadedFileName, setCaym1UploadedFileName] = useState<string | null>(null);
+  const [caym2UploadedFileName, setCaym2UploadedFileName] = useState<string | null>(null);
+
+  const [c5LastRecalculated, setC5LastRecalculated] = useState<string | null>(null);
+  const [isC5Dirty, setIsC5Dirty] = useState<boolean>(false);
 
   const handleCalculateC4Results = (results: {
     ER: number;
@@ -958,7 +975,31 @@ export default function App() {
           </div>
         ) : activeCriterion.id === 'C5' && c5ActiveTab === 'calculator' ? (
           <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0 bg-slate-50/30 p-6 rounded-3xl border border-slate-100">
-            <CR5Module onCalculateResults={handleCalculateC5Results} />
+            <CR5Module 
+              onCalculateResults={handleCalculateC5Results}
+              cayFacultyList={cayFacultyList}
+              setCayFacultyList={setCayFacultyList}
+              caym1FacultyList={caym1FacultyList}
+              setCaym1FacultyList={setCaym1FacultyList}
+              caym2FacultyList={caym2FacultyList}
+              setCaym2FacultyList={setCaym2FacultyList}
+              calcCayFacultyList={calcCayFacultyList}
+              setCalcCayFacultyList={setCalcCayFacultyList}
+              calcCaym1FacultyList={calcCaym1FacultyList}
+              setCalcCaym1FacultyList={setCalcCaym1FacultyList}
+              calcCaym2FacultyList={calcCaym2FacultyList}
+              setCalcCaym2FacultyList={setCalcCaym2FacultyList}
+              cayUploadedFileName={cayUploadedFileName}
+              setCayUploadedFileName={setCayUploadedFileName}
+              caym1UploadedFileName={caym1UploadedFileName}
+              setCaym1UploadedFileName={setCaym1UploadedFileName}
+              caym2UploadedFileName={caym2UploadedFileName}
+              setCaym2UploadedFileName={setCaym2UploadedFileName}
+              lastRecalculated={c5LastRecalculated}
+              setLastRecalculated={setC5LastRecalculated}
+              isDirty={isC5Dirty}
+              setIsDirty={setIsC5Dirty}
+            />
           </div>
         ) : (
           /* Dashboard Grid */

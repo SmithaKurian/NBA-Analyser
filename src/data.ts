@@ -32,6 +32,8 @@ export interface FacultyEntry {
   presentDesignation: string;
   nature: string;
   currentlyAssociated: boolean;
+  dateDesignatedProf?: string;
+  dateOfLeaving?: string;
 }
 
 export const NBA_DATA: YearData[] = [
