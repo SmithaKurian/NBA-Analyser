@@ -24,7 +24,7 @@ import {
   Calculator
 } from 'lucide-react';
 import { HistoryModal } from './components/HistoryModal';
-import { CR4Module } from './components/CR4Module';
+import { CR4Module, RowData } from './components/CR4Module';
 import { CR5Module } from './components/CR5Module';
 import { HISTORICAL_DATA, ALL_ACADEMIC_YEARS } from './utils';
 import { FacultyEntry } from './data';
@@ -260,6 +260,14 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [c4ActiveTab, setC4ActiveTab] = useState<'analyzer' | 'calculator'>('analyzer');
   const [c5ActiveTab, setC5ActiveTab] = useState<'analyzer' | 'calculator'>('analyzer');
+
+  // Hoisted Criterion 4 states to prevent reset on tab change
+  const [c4FormData, setC4FormData] = useState<Record<string, Record<string, RowData>>>({});
+  const [isC4Calculated, setIsC4Calculated] = useState(false);
+  const [c4UploadedFileName, setC4UploadedFileName] = useState<string | null>(null);
+  const [c4UploadStatus, setC4UploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [c4ShowFormatGuide, setC4ShowFormatGuide] = useState(true);
+  const [c4ActiveGuideTab, setC4ActiveGuideTab] = useState<'ER' | 'SR' | 'API' | 'PI'>('ER');
 
   // Hoisted Criterion 5 states to prevent reset on tab change
   const [cayFacultyList, setCayFacultyList] = useState<FacultyEntry[]>([]);
@@ -971,7 +979,21 @@ export default function App() {
 
         {activeCriterion.id === 'C4' && c4ActiveTab === 'calculator' ? (
           <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0 bg-slate-50/30 p-6 rounded-3xl border border-slate-100">
-            <CR4Module onCalculateResults={handleCalculateC4Results} />
+            <CR4Module 
+              onCalculateResults={handleCalculateC4Results}
+              formData={c4FormData}
+              setFormData={setC4FormData}
+              isCalculated={isC4Calculated}
+              setIsCalculated={setIsC4Calculated}
+              uploadedFileName={c4UploadedFileName}
+              setUploadedFileName={setC4UploadedFileName}
+              uploadStatus={c4UploadStatus}
+              setUploadStatus={setC4UploadStatus}
+              showFormatGuide={c4ShowFormatGuide}
+              setShowFormatGuide={setC4ShowFormatGuide}
+              activeGuideTab={c4ActiveGuideTab}
+              setActiveGuideTab={setC4ActiveGuideTab}
+            />
           </div>
         ) : activeCriterion.id === 'C5' && c5ActiveTab === 'calculator' ? (
           <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0 bg-slate-50/30 p-6 rounded-3xl border border-slate-100">

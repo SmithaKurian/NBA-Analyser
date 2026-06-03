@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-interface RowData {
+export interface RowData {
   [key: string]: string;
 }
 
@@ -154,13 +154,35 @@ interface CR4ModuleProps {
     API3: number;
     PI: number;
   }) => void;
+  formData: Record<string, Record<string, RowData>>;
+  setFormData: React.Dispatch<React.SetStateAction<Record<string, Record<string, RowData>>>>;
+  isCalculated: boolean;
+  setIsCalculated: React.Dispatch<React.SetStateAction<boolean>>;
+  uploadedFileName: string | null;
+  setUploadedFileName: React.Dispatch<React.SetStateAction<string | null>>;
+  uploadStatus: { type: 'success' | 'error'; message: string } | null;
+  setUploadStatus: React.Dispatch<React.SetStateAction<{ type: 'success' | 'error'; message: string } | null>>;
+  showFormatGuide: boolean;
+  setShowFormatGuide: React.Dispatch<React.SetStateAction<boolean>>;
+  activeGuideTab: 'ER' | 'SR' | 'API' | 'PI';
+  setActiveGuideTab: React.Dispatch<React.SetStateAction<'ER' | 'SR' | 'API' | 'PI'>>;
 }
 
-export function CR4Module({ onCalculateResults }: CR4ModuleProps) {
-  const [formData, setFormData] = useState<Record<string, Record<string, RowData>>>({});
-  const [isCalculated, setIsCalculated] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+export function CR4Module({
+  onCalculateResults,
+  formData,
+  setFormData,
+  isCalculated,
+  setIsCalculated,
+  uploadedFileName,
+  setUploadedFileName,
+  uploadStatus,
+  setUploadStatus,
+  showFormatGuide,
+  setShowFormatGuide,
+  activeGuideTab,
+  setActiveGuideTab,
+}: CR4ModuleProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleInputChange = (sectionId: string, year: string, fieldId: string, value: string) => {
@@ -309,7 +331,7 @@ export function CR4Module({ onCalculateResults }: CR4ModuleProps) {
           throw new Error("Excel file is empty or missing headers.");
         }
 
-        // Smart column finder
+        // Smart column finder with specific exclusions
         let colIdxs = {
           section: 0,
           year: 2,
@@ -317,73 +339,107 @@ export function CR4Module({ onCalculateResults }: CR4ModuleProps) {
           value: 5
         };
 
-        const headerRow = jsonData[0];
+        const headerRow = jsonData[0] || [];
         headerRow.forEach((h, idx) => {
           if (!h) return;
           const s = String(h).toLowerCase().trim();
-          if (s.includes('section code') || s === 'section' || s === 'code') {
+          
+          // Match "Section Code", avoiding "Section Name"
+          if (s === 'section code' || (s.includes('section') && s.includes('code'))) {
             colIdxs.section = idx;
-          } else if (s.includes('academic year') || s.includes('year') || s.includes('period')) {
+          } else if (s === 'section' && colIdxs.section === 0) {
+            colIdxs.section = idx;
+          }
+          
+          // Match "Academic Year label" or general year indicators
+          if (s.includes('academic year') || s === 'year' || s === 'academic year label' || s === 'cohort') {
             colIdxs.year = idx;
-          } else if (s.includes('variable code') || s.includes('variable') || s === 'token') {
+          }
+          
+          // Match "Variable Code", strictly avoiding "Variable Name" and "Description"
+          if (s === 'variable code' || (s.includes('variable') && !s.includes('name') && !s.includes('desc'))) {
             colIdxs.variable = idx;
-          } else if (s.includes('value') || s.includes('count') || s.includes('score')) {
+          }
+          
+          // Match "Value", avoiding description text column
+          if (s === 'value' || s.includes('val') || s === 'score') {
             colIdxs.value = idx;
           }
         });
 
-        const newFormData: Record<string, Record<string, RowData>> = { ...formData };
-        let parsedCount = 0;
+        // Parse function to handle data reading
+        const tryParseRows = (mapping: typeof colIdxs) => {
+          const tempFormData: Record<string, Record<string, RowData>> = {};
+          let count = 0;
+          
+          for (let r = 1; r < jsonData.length; r++) {
+            const row = jsonData[r];
+            if (!row || row.length === 0) continue;
 
-        for (let r = 1; r < jsonData.length; r++) {
-          const row = jsonData[r];
-          if (!row || row.length === 0) continue;
+            const getCellStr = (idx: number, def = '') => {
+              if (idx === undefined || idx < 0 || idx >= row.length) return def;
+              const val = row[idx];
+              if (val === undefined || val === null) return def;
+              return String(val).trim();
+            };
 
-          const getCellStr = (idx: number, def = '') => {
-            if (idx === undefined || idx < 0) return def;
-            const val = row[idx];
-            if (val === undefined || val === null) return def;
-            return String(val).trim();
+            const secCode = getCellStr(mapping.section).toUpperCase().trim();
+            const yearStr = getCellStr(mapping.year).trim();
+            const varCode = getCellStr(mapping.variable).toUpperCase().trim();
+            const rawVal = getCellStr(mapping.value).trim();
+
+            if (!secCode || !yearStr || !varCode || rawVal === '') continue;
+
+            // Find matching section configuration
+            const sectionConfig = SECTIONS.find(s => s.id.toLowerCase() === secCode.toLowerCase());
+            if (!sectionConfig) continue;
+
+            // Fuzzy match target academic year label
+            const matchingYear = sectionConfig.years.find(y => {
+              const yClean = y.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const valClean = yearStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return yClean.includes(valClean) || valClean.includes(yClean) || yClean.startsWith(valClean) || valClean.startsWith(yClean);
+            });
+
+            if (!matchingYear) continue;
+
+            // Verify if variable code is supported in this section
+            const hasField = sectionConfig.fields.some(f => f.id === varCode);
+            if (!hasField) continue;
+
+            if (!tempFormData[secCode]) {
+              tempFormData[secCode] = {};
+            }
+            if (!tempFormData[secCode][matchingYear]) {
+              tempFormData[secCode][matchingYear] = {};
+            }
+
+            tempFormData[secCode][matchingYear][varCode] = rawVal;
+            count++;
+          }
+          return { data: tempFormData, count };
+        };
+
+        // Try mapping found via headers first
+        let parseResult = tryParseRows(colIdxs);
+
+        // Fallback to strict standard indexes if smart headers failed to yield matches
+        if (parseResult.count === 0) {
+          const fallbackIdxs = {
+            section: 0,   // Column A
+            year: 2,      // Column C
+            variable: 3,  // Column D
+            value: 5      // Column F
           };
-
-          const secCode = getCellStr(colIdxs.section).toUpperCase();
-          const yearStr = getCellStr(colIdxs.year);
-          const varCode = getCellStr(colIdxs.variable).toUpperCase();
-          const rawVal = getCellStr(colIdxs.value);
-
-          if (!secCode || !yearStr || !varCode || rawVal === '') continue;
-
-          // Find matching section configuration
-          const sectionConfig = SECTIONS.find(s => s.id.toLowerCase() === secCode.toLowerCase());
-          if (!sectionConfig) continue;
-
-          // Fuzzy match target academic year label
-          const matchingYear = sectionConfig.years.find(y => {
-            const yClean = y.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const valClean = yearStr.toLowerCase().replace(/[^a-z0-9]/g, '');
-            return yClean.includes(valClean) || valClean.includes(yClean) || yClean.startsWith(valClean) || valClean.startsWith(yClean);
-          });
-
-          if (!matchingYear) continue;
-
-          // Verify if variable code is supported in this section
-          const hasField = sectionConfig.fields.some(f => f.id === varCode);
-          if (!hasField) continue;
-
-          if (!newFormData[secCode]) {
-            newFormData[secCode] = {};
-          }
-          if (!newFormData[secCode][matchingYear]) {
-            newFormData[secCode][matchingYear] = {};
-          }
-
-          newFormData[secCode][matchingYear][varCode] = rawVal;
-          parsedCount++;
+          parseResult = tryParseRows(fallbackIdxs);
         }
 
-        if (parsedCount === 0) {
-          throw new Error("Could not parse any matching metrics from sheet. Ensure Col A is Section Code and Col D is Variable Code.");
+        if (parseResult.count === 0) {
+          throw new Error("Could not parse any matching metrics from sheet. Ensure Column A has Section Codes (ER, SR, API1, etc.), Column C has Academic Years, Column D has Variable Codes (N, N1, A, B, etc.) and Column F has numerical values.");
         }
+
+        const newFormData: Record<string, Record<string, RowData>> = { ...formData, ...parseResult.data };
+        const parsedCount = parseResult.count;
 
         setFormData(newFormData);
         setUploadedFileName(file.name);
@@ -504,29 +560,216 @@ export function CR4Module({ onCalculateResults }: CR4ModuleProps) {
           </div>
         )}
 
-        {/* Map specifications */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
-          <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest leading-none">
-            Excel Column Mapping Protocol
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-[10px] text-slate-500 font-bold">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col A / Section Code</span>
-              <span className="text-slate-400 font-medium font-bold uppercase tracking-tight">Accepts: ER, SR, API1, API2, API3, PI</span>
+        {/* Interactive Excel Schema Guide & Data Protocol Analyzer */}
+        <div className="bg-slate-50 border border-slate-200 rounded-3xl overflow-hidden shadow-inner">
+          <div className="px-6 py-5 bg-slate-100/80 border-b border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+              <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">
+                Accreditation Data Format Directory & Field Analyzer
+              </h4>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col B / Section Title</span>
-              <span className="text-slate-400 font-medium font-bold uppercase tracking-tight">Enrollment Ratio, Success Rate, API, Placement</span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col C / Academic Year</span>
-              <span className="text-slate-400 font-medium font-bold uppercase tracking-tight">e.g. CAY (25-26), LYG (21-22), CAYm1 (24-25), etc.</span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-slate-800 font-extrabold uppercase tracking-tight">Col D & F / Variable & Value</span>
-              <span className="text-slate-400 font-medium font-bold uppercase tracking-tight">Token field (N, X, B, FS etc.) and numeric value</span>
-            </div>
+            <button
+              onClick={() => setShowFormatGuide(!showFormatGuide)}
+              className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[11px] font-black uppercase tracking-wider border border-slate-200 transition-colors shadow-sm cursor-pointer"
+            >
+              {showFormatGuide ? "Hide Format Schema" : "Show Format Schema"}
+            </button>
           </div>
+
+          <AnimatePresence>
+            {showFormatGuide && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="p-6 md:p-8 space-y-8"
+              >
+                {/* Visual Excel Layout Grid */}
+                <div className="space-y-3">
+                  <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    Spreadsheet Columns Mapping (Expected Format)
+                  </h5>
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    <div className="p-3 bg-white hover:bg-slate-100/50 border border-slate-200 rounded-xl transition-colors">
+                      <span className="block text-[8px] font-bold text-blue-500 uppercase">Column A</span>
+                      <span className="block text-xs font-black text-slate-900 mt-0.5">Section Code</span>
+                      <p className="text-[9px] font-medium text-slate-500 mt-1 uppercase">Fuzzy matched e.g. ER, SR, API1, API2, API3, PI</p>
+                    </div>
+                    <div className="p-3 bg-white hover:bg-slate-100/50 border border-slate-200 rounded-xl transition-colors">
+                      <span className="block text-[8px] font-bold text-slate-400 uppercase">Column B</span>
+                      <span className="block text-xs font-black text-slate-900 mt-0.5">Section Title</span>
+                      <p className="text-[9px] font-medium text-slate-500 mt-1 uppercase">Descriptive label (not strictly matched)</p>
+                    </div>
+                    <div className="p-3 bg-white hover:bg-slate-100/50 border border-slate-200 rounded-xl transition-colors">
+                      <span className="block text-[8px] font-bold text-blue-500 uppercase">Column C</span>
+                      <span className="block text-xs font-black text-slate-900 mt-0.5">Academic Year</span>
+                      <p className="text-[9px] font-medium text-slate-500 mt-1 uppercase">Matches format like CAY (25-26), LYG (21-22), etc.</p>
+                    </div>
+                    <div className="p-3 bg-white hover:bg-slate-100/50 border border-slate-200 rounded-xl transition-colors">
+                      <span className="block text-[8px] font-bold text-emerald-600 uppercase">Column D</span>
+                      <span className="block text-xs font-black text-slate-900 mt-0.5">Variable Code</span>
+                      <p className="text-[9px] font-medium text-slate-500 mt-1 uppercase">Metric key e.g. N, N1, B, FS, X, Y, Z</p>
+                    </div>
+                    <div className="p-3 bg-white hover:bg-slate-100/50 border border-slate-200 rounded-xl transition-colors">
+                      <span className="block text-[8px] font-bold text-slate-400 uppercase">Column E</span>
+                      <span className="block text-xs font-black text-slate-900 mt-0.5">Variable Desc</span>
+                      <p className="text-[9px] font-medium text-slate-500 mt-1 uppercase">Ignored in parsing, kept for readability</p>
+                    </div>
+                    <div className="p-3 bg-white hover:bg-slate-100/50 border border-slate-200 rounded-xl transition-colors">
+                      <span className="block text-[8px] font-bold text-emerald-600 uppercase">Column F</span>
+                      <span className="block text-xs font-black text-slate-900 mt-0.5">Value</span>
+                      <p className="text-[9px] font-medium text-slate-500 mt-1 uppercase">Plain numeric value of the metric</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Criterion Code Dictionary Toggles */}
+                <div className="flex flex-col gap-4 border-t border-slate-200/60 pt-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                      Variable Dictionary by Category
+                    </h5>
+                    {/* Tabs */}
+                    <div className="bg-slate-200/60 p-1 rounded-xl flex gap-1">
+                      {(['ER', 'SR', 'API', 'PI'] as const).map((tab) => (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveGuideTab(tab)}
+                          className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold uppercase transition-all tracking-wide cursor-pointer ${
+                            activeGuideTab === tab
+                              ? "bg-white text-blue-600 shadow-sm"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          {tab === 'ER' && "Enrollment Ratio (ER)"}
+                          {tab === 'SR' && "Success Rate (SR)"}
+                          {tab === 'API' && "Academic Performance (API)"}
+                          {tab === 'PI' && "Placement Rate (PI)"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tab Contents */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden p-5">
+                    {activeGuideTab === 'ER' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <span className="text-xs font-black text-slate-800">ENROLLMENT RATIO METRICS</span>
+                          <span className="text-[10px] bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg font-black uppercase border border-blue-100">
+                            Section Code: ER
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-blue-600 text-white rounded px-2 py-0.5 text-[10px] font-black">N</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Sanctioned intake of the program</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: CAY (25-26), CAYm1, CAYm2</span>
+                          </div>
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-blue-600 text-white rounded px-2 py-0.5 text-[10px] font-black">N1</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Total no. of students admitted in 1st year</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: CAY (25-26), CAYm1, CAYm2</span>
+                          </div>
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-blue-600 text-white rounded px-2 py-0.5 text-[10px] font-black">N4</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Admitted via supernumerary quotas</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: CAY (25-26), CAYm1, CAYm2</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeGuideTab === 'SR' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <span className="text-xs font-black text-slate-800">SUCCESS RATE METRICS</span>
+                          <span className="text-[10px] bg-violet-50 text-violet-600 px-2.5 py-1 rounded-lg font-black uppercase border border-violet-100">
+                            Section Code: SR
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-violet-600 text-white rounded px-2 py-0.5 text-[10px] font-black">A</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Total admitted including lateral entry (Adjusted)</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: LYG (21-22), LYGm1, LYGm2</span>
+                          </div>
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-violet-600 text-white rounded px-2 py-0.5 text-[10px] font-black">B</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Number of students graduated from the program</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: LYG, LYGm1, LYGm2</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeGuideTab === 'API' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <span className="text-xs font-black text-slate-800">ACADEMIC PERFORMANCE INDEX (API) METRICS</span>
+                          <span className="text-[10px] bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg font-black uppercase border border-amber-100">
+                            Section Codes: API1 (~1st yr), API2 (~2nd yr), API3 (~3rd yr)
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-amber-600 text-white rounded px-2 py-0.5 text-[10px] font-black">X</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Mean GPA score or (Mean % / 10)</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: CAYm1, CAYm2, CAYm3</span>
+                          </div>
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-amber-600 text-white rounded px-2 py-0.5 text-[10px] font-black">Y</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Total number of successful students</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: CAYm1, CAYm2, CAYm3</span>
+                          </div>
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-amber-600 text-white rounded px-2 py-0.5 text-[10px] font-black">Z</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Total number of students appeared</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: CAYm1, CAYm2, CAYm3</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeGuideTab === 'PI' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <span className="text-xs font-black text-slate-800">PLACEMENT / HIGHER STUDIES / ENTREPRENEURSHIP METRICS</span>
+                          <span className="text-[10px] bg-rose-50 text-rose-600 px-2.5 py-1 rounded-lg font-black uppercase border border-rose-100">
+                            Section Code: PI
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-rose-600 text-white rounded px-2 py-0.5 text-[10px] font-black">FS</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Total final year students</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: LYG, LYGm1, LYGm2</span>
+                          </div>
+                          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-rose-600 text-white rounded px-2 py-0.5 text-[10px] font-black">X</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Placed students count</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: LYG, LYGm1, LYGm2</span>
+                          </div>
+                          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-rose-600 text-white rounded px-2 py-0.5 text-[10px] font-black">Y</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Higher studies selection count</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: LYG, LYGm1, LYGm2</span>
+                          </div>
+                          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="inline-block bg-rose-600 text-white rounded px-2 py-0.5 text-[10px] font-black">Z</span>
+                            <span className="block text-xs font-black text-slate-800 mt-2">Entrepreneurship ventures registered</span>
+                            <span className="block text-[10px] text-slate-400 mt-1 uppercase font-bold">Years: LYG, LYGm1, LYGm2</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
 
@@ -538,7 +781,7 @@ export function CR4Module({ onCalculateResults }: CR4ModuleProps) {
               className={`flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:-translate-y-1 transition-all active:translate-y-0 group cursor-pointer ${isCalculated ? 'bg-green-600 shadow-green-600/30' : ''}`}
             >
               {isCalculated ? <CheckCircle2 size={20} /> : <Calculator size={20} className="group-hover:rotate-12 transition-transform" />}
-              {isCalculated ? 'Run CR4(2) Audit Calculation' : 'Run CR4 Audit Calculation'}
+              RUN CR4 AUDIT CALCULATION
             </button>
          </div>
       </div>
