@@ -26,8 +26,11 @@ import {
 interface SubCriteria {
   id: string;
   name: string;
+  requirement: string;
   maxMarks: number;
   awardedMarks: number;
+  status?: 'Matched' | 'Partial' | 'Missing' | 'Mismatch';
+  remarks?: string;
 }
 
 interface Criterion {
@@ -36,6 +39,7 @@ interface Criterion {
   subCriteria: SubCriteria[];
   strengths: string[];
   discrepancies: string[];
+  assumptions: string[];
 }
 
 const CRITERIA_DATA: Criterion[] = [
@@ -44,149 +48,194 @@ const CRITERIA_DATA: Criterion[] = [
     name: "Outcome-based Curriculum",
     strengths: [],
     discrepancies: [],
+    assumptions: [
+      "SAR Section 1.1 is expected to strictly follow Annexure-I format.",
+      "PEOs listed in SAR are compared against Departmental Mission statement for semantic alignment.",
+      "Vision/Mission dissemination is verified through timestamps on minutes of meetings."
+    ],
     subCriteria: [
-      { id: "1.1.1", name: "State Vision & Mission (Availability & Appropriateness)", maxMarks: 5, awardedMarks: 0 },
-      { id: "1.1.2", name: "State PEOs & Appropriateness (Listing 3 to 5)", maxMarks: 5, awardedMarks: 0 },
-      { id: "1.1.3", name: "Process of Defining V/M & PEOs (Stakeholder Participation)", maxMarks: 10, awardedMarks: 0 },
-      { id: "1.1.4", name: "Dissemination of V/M & PEOs (Website/Notice Boards)", maxMarks: 5, awardedMarks: 0 },
-      { id: "1.1.5", name: "Mapping of PEOs with Mission (Matrix Consistency)", maxMarks: 10, awardedMarks: 0 },
-      { id: "1.2.1", name: "Curriculum Revision Process (Industry Involvement)", maxMarks: 10, awardedMarks: 0 },
-      { id: "1.2.2", name: "Curriculum Structure (Credits & Learning Hours)", maxMarks: 10, awardedMarks: 0 },
-      { id: "1.2.3", name: "Components of Curriculum (Attainment of PO/PSOs)", maxMarks: 5, awardedMarks: 0 },
-      { id: "1.2.4", name: "Strategies for Education Reforms (NEP 2020/ABC)", maxMarks: 5, awardedMarks: 0 },
-      { id: "1.3.1", name: "POs and PSOs Listing & Appropriateness", maxMarks: 5, awardedMarks: 0 },
-      { id: "1.3.2", name: "Mapping between Courses and POs/PSOs", maxMarks: 15, awardedMarks: 0 },
-      { id: "1.4.1", name: "Course Outcome Quality (Semester-wise)", maxMarks: 15, awardedMarks: 0 },
-      { id: "1.4.2", name: "Course Articulation Matrix Accuracy", maxMarks: 15, awardedMarks: 0 },
-      { id: "1.5", name: "Program Articulation Matrix (Overall Summary)", maxMarks: 5, awardedMarks: 0 },
+      { id: "1.1.1", name: "State Vision & Mission (Availability & Appropriateness)", requirement: "Availability & Appropriateness of the Vision & Mission Statements. Must be distinct and follow Tier-I quality benchmarks.", maxMarks: 5, awardedMarks: 0 },
+      { id: "1.1.2", name: "State PEOs & Appropriateness (Listing 3 to 5)", requirement: "State the Programme Educational Objectives (PEOs). Must list 3 to 5 objectives and explain their appropriateness.", maxMarks: 5, awardedMarks: 0 },
+      { id: "1.1.3", name: "Process of Defining V/M & PEOs (Stakeholder Participation)", requirement: "Documented process for defining Vision, Mission, and PEOs with evidence of internal and external stakeholder participation.", maxMarks: 10, awardedMarks: 0 },
+      { id: "1.1.4", name: "Dissemination of V/M & PEOs (Website/Notice Boards)", requirement: "Evidence of dissemination among stakeholders (Website, Notice Boards, Laboratory, etc.).", maxMarks: 5, awardedMarks: 0 },
+      { id: "1.1.5", name: "Mapping of PEOs with Mission (Matrix Consistency)", requirement: "Consistency of mapping PEOs with the Mission of the Department. Matrix must show strong/moderate/weak correlation.", maxMarks: 10, awardedMarks: 0 },
+      { id: "1.2.1", name: "Curriculum Revision Process (Industry Involvement)", requirement: "Clear evidence of industry involvement in the Board of Studies (BoS) and syllabus revision meetings.", maxMarks: 10, awardedMarks: 0 },
+      { id: "1.2.2", name: "Curriculum Structure (Credits & Learning Hours)", requirement: "Credit structure must align with AICTE/University norms. Balance between Basic Sciences, Engg Sciences, and Professional Core.", maxMarks: 10, awardedMarks: 0 },
+      { id: "1.2.3", name: "Components of Curriculum (Attainment of PO/PSOs)", requirement: "Mapping of curriculum components to Program Outcomes (POs) and Program Specific Outcomes (PSOs).", maxMarks: 5, awardedMarks: 0 },
+      { id: "1.2.4", name: "Strategies for Education Reforms (NEP 2020/ABC)", requirement: "Implementation of Credit Transfer, Academic Bank of Credits, and NEP 2020 guidelines.", maxMarks: 5, awardedMarks: 0 },
+      { id: "1.3.1", name: "POs and PSOs Listing & Appropriateness", requirement: "Clearly defined PSOs related to the specific engineering field. Listing of Graduate Attributes (POs).", maxMarks: 5, awardedMarks: 0 },
+      { id: "1.3.2", name: "Mapping between Courses and POs/PSOs", requirement: "Comprehensive Course-to-PO/PSO mapping template for all semesters.", maxMarks: 15, awardedMarks: 0 },
+      { id: "1.4.1", name: "Course Outcome Quality (Semester-wise)", requirement: "Statement of COs using Bloom's Taxonomy levels. Clarity and measurability of COs.", maxMarks: 15, awardedMarks: 0 },
+      { id: "1.4.2", name: "Course Articulation Matrix Accuracy", requirement: "Correctness of mapping levels (1, 2, 3) in the Articulation Matrix.", maxMarks: 15, awardedMarks: 0 },
+      { id: "1.5", name: "Program Articulation Matrix (Overall Summary)", requirement: "Grand summary of PO/PSO attainment targets for the entire program.", maxMarks: 5, awardedMarks: 0 },
     ]
   },
   { 
     id: "C2", 
     name: "Outcome Based Teaching Learning", 
     strengths: [], discrepancies: [],
+    assumptions: [
+      "Academic calendar in SAR matches the university prescribed schedule.",
+      "Capstone project monitoring requires documented periodic check-ins.",
+      "Industrial training feedback must be mapped to PO7 and PO12."
+    ],
     subCriteria: [
-      { id: "2.1", name: "Quality of Teaching & Learning (Academic Calendar)", maxMarks: 20, awardedMarks: 0 },
-      { id: "2.2", name: "Quality of Student Capstone Project (Monitoring)", maxMarks: 25, awardedMarks: 0 },
-      { id: "2.3", name: "Internship/Industrial Training (Feedback Analysis)", maxMarks: 10, awardedMarks: 0 },
-      { id: "2.4", name: "Seminar and Mini/Micro Projects Mapping", maxMarks: 10, awardedMarks: 0 },
-      { id: "2.5", name: "Case Studies and Real-Life Examples", maxMarks: 10, awardedMarks: 0 },
-      { id: "2.6", name: "SWAYAM/NPTEL/Self-Learning Certifications", maxMarks: 10, awardedMarks: 0 },
-      { id: "2.7", name: "Complex Problem Solving (Sustainability/SDG)", maxMarks: 20, awardedMarks: 0 },
-      { id: "2.8", name: "Industry Institute Partnerships (Impact Analysis)", maxMarks: 15, awardedMarks: 0 }
+      { id: "2.1", name: "Quality of Teaching & Learning (Academic Calendar)", requirement: "Adherence to academic calendar, implementation of pedagogical tools, and documentation of innovative teaching.", maxMarks: 20, awardedMarks: 0 },
+      { id: "2.2", name: "Quality of Student Capstone Project (Monitoring)", requirement: "Monitoring mechanism for student projects, rubric-based evaluation, and project reports quality.", maxMarks: 25, awardedMarks: 0 },
+      { id: "2.3", name: "Internship/Industrial Training (Feedback Analysis)", requirement: "Internship completion certificates and analysis of feedback from the industry supervisor.", maxMarks: 10, awardedMarks: 0 },
+      { id: "2.4", name: "Seminar and Mini/Micro Projects Mapping", requirement: "Seminar topics selection and their relevance to current technology and PO mapping.", maxMarks: 10, awardedMarks: 0 },
+      { id: "2.5", name: "Case Studies and Real-Life Examples", requirement: "Inclusion of case studies in standard teaching-learning evaluation cycles.", maxMarks: 10, awardedMarks: 0 },
+      { id: "2.6", name: "SWAYAM/NPTEL/Self-Learning Certifications", requirement: "Encouragement and completion rates for online credit courses (SWAYAM).", maxMarks: 10, awardedMarks: 0 },
+      { id: "2.7", name: "Complex Problem Solving (Sustainability/SDG)", requirement: "Evidence of covering complex engineering problems with sustainability focus.", maxMarks: 20, awardedMarks: 0 },
+      { id: "2.8", name: "Industry Institute Partnerships (Impact Analysis)", requirement: "MoUs signed and the actual impact on students (Expert lectures, visits, training).", maxMarks: 15, awardedMarks: 0 }
     ] 
   },
   { 
     id: "C3", 
     name: "Outcome-Based Assessment", 
     strengths: [], discrepancies: [],
+    assumptions: [
+      "Internal exam question papers must show direct mapping to Course Outcomes.",
+      "Laboratory rubrics must be approved by the Departmental Committee.",
+      "CO attainment calculation methodology is consistent across all semesters."
+    ],
     subCriteria: [
-      { id: "3.1", name: "Continuous Assessment (Internal Exams/CO Mapping)", maxMarks: 10, awardedMarks: 0 },
-      { id: "3.2", name: "Semester End Exam Question Paper Quality", maxMarks: 10, awardedMarks: 0 },
-      { id: "3.3", name: "Laboratory Work & Rubrics Utilization", maxMarks: 10, awardedMarks: 0 },
-      { id: "3.4", name: "Industrial Training Evaluation (Relevance)", maxMarks: 10, awardedMarks: 0 },
-      { id: "3.5", name: "Evaluation of Projects (Teamwork/Management)", maxMarks: 20, awardedMarks: 0 },
-      { id: "3.6", name: "Sustainable Development Goals (SDG) Evidence", maxMarks: 10, awardedMarks: 0 },
-      { id: "3.7.1", name: "Assessment Tools & Data Collection Processes", maxMarks: 5, awardedMarks: 0 },
-      { id: "3.7.2", name: "CO Attainment Records (Set Levels)", maxMarks: 20, awardedMarks: 0 },
-      { id: "3.8.1", name: "PO & PSO Evaluation (Attainment Results)", maxMarks: 25, awardedMarks: 0 }
+      { id: "3.1", name: "Continuous Assessment (Internal Exams/CO Mapping)", requirement: "Mapping of Internal Assessment questions with COs and quality of questions.", maxMarks: 10, awardedMarks: 0 },
+      { id: "3.2", name: "Semester End Exam Question Paper Quality", requirement: "Quality of University/Semester End Exam papers and mapping with COs.", maxMarks: 10, awardedMarks: 0 },
+      { id: "3.3", name: "Laboratory Work & Rubrics Utilization", requirement: "Rubrics for assessment of laboratory work and continuous evaluation records.", maxMarks: 10, awardedMarks: 0 },
+      { id: "3.4", name: "Industrial Training Evaluation (Relevance)", requirement: "Evaluation process for industrial training based on documented PO parameters.", maxMarks: 10, awardedMarks: 0 },
+      { id: "3.5", name: "Evaluation of Projects (Teamwork/Management)", requirement: "Evaluation criteria for projects including teamwork, ethics, and costs.", maxMarks: 20, awardedMarks: 0 },
+      { id: "3.6", name: "Sustainable Development Goals (SDG) Evidence", requirement: "Projects and assessments covering SDG goals as per NBA latest guidelines.", maxMarks: 10, awardedMarks: 0 },
+      { id: "3.7.1", name: "Assessment Tools & Data Collection Processes", requirement: "Description of direct and indirect assessment tools used for CO attainment.", maxMarks: 5, awardedMarks: 0 },
+      { id: "3.7.2", name: "CO Attainment Records (Set Levels)", requirement: "Attainment of COs calculated semester by semester for all courses.", maxMarks: 20, awardedMarks: 0 },
+      { id: "3.8.1", name: "PO & PSO Evaluation (Attainment Results)", requirement: "Evaluation of PO/PSO attainment levels based on Course-Outcome mapping results.", maxMarks: 25, awardedMarks: 0 }
     ]
   },
   { 
     id: "C4", 
     name: "Students’ Performance", 
     strengths: [], discrepancies: [],
+    assumptions: [
+      "Enrollment ratios are calculated using the AICTE sanctioned intake.",
+      "Success rate points exclude lateral entry students where specified.",
+      "Higher studies evidence requires verified qualifying exam scorecards."
+    ],
     subCriteria: [
-      { id: "4.1", name: "Enrolment Ratio in the First Year (Average 3yrs)", maxMarks: 20, awardedMarks: 0 },
-      { id: "4.2", name: "Success Rate in Stipulated Period (SR Points)", maxMarks: 15, awardedMarks: 0 },
-      { id: "4.3", name: "Academic Performance Index (API) 1st Year", maxMarks: 10, awardedMarks: 0 },
-      { id: "4.4", name: "Academic Performance Index (API) 2nd Year", maxMarks: 10, awardedMarks: 0 },
-      { id: "4.5", name: "Academic Performance Index (API) 3rd Year", maxMarks: 10, awardedMarks: 0 },
-      { id: "4.6", name: "Placement, Higher Studies & Entrepreneurship", maxMarks: 30, awardedMarks: 0 },
-      { id: "4.7.1", name: "Professional Societies & Events Organized", maxMarks: 5, awardedMarks: 0 },
-      { id: "4.7.2", name: "Students' Participation in External Events", maxMarks: 10, awardedMarks: 0 },
-      { id: "4.7.3", name: "Journals, Magazines & Newsletters (Publication)", maxMarks: 5, awardedMarks: 0 },
-      { id: "4.7.4", name: "Student Publications & Awards Received", maxMarks: 5, awardedMarks: 0 }
+      { id: "4.1", name: "Enrolment Ratio in the First Year (Average 3yrs)", requirement: "Enrolment Ratio (Average of last 3 academic years). Target is >90% for full marks.", maxMarks: 20, awardedMarks: 0 },
+      { id: "4.2", name: "Success Rate in Stipulated Period (SR Points)", requirement: "Success rate without backlogs in four years. Calculated as per NBA specified formula.", maxMarks: 15, awardedMarks: 0 },
+      { id: "4.3", name: "Academic Performance Index (API) 1st Year", requirement: "Average GPA of first-year students. Verified against university results data.", maxMarks: 10, awardedMarks: 0 },
+      { id: "4.4", name: "Academic Performance Index (API) 2nd Year", requirement: "Average GPA of second-year students.", maxMarks: 10, awardedMarks: 0 },
+      { id: "4.5", name: "Academic Performance Index (API) 3rd Year", requirement: "Average GPA of third-year students.", maxMarks: 10, awardedMarks: 0 },
+      { id: "4.6", name: "Placement, Higher Studies & Entrepreneurship", requirement: "Percentage of students placed or choosing higher studies/entrepreneurship. Must be >70%.", maxMarks: 30, awardedMarks: 0 },
+      { id: "4.7.1", name: "Professional Societies & Events Organized", requirement: "Chapters/Memberships of IEEE, ACM, CSI etc. and technical events conducted.", maxMarks: 5, awardedMarks: 0 },
+      { id: "4.7.2", name: "Students' Participation in External Events", requirement: "Documentation of prizes won and participation in external hackathons/IIT events.", maxMarks: 10, awardedMarks: 0 },
+      { id: "4.7.3", name: "Journals, Magazines & Newsletters (Publication)", requirement: "In-house technical newsletters and department magazines with student content.", maxMarks: 5, awardedMarks: 0 },
+      { id: "4.7.4", name: "Student Publications & Awards Received", requirement: "Awards in national/international level technical competitions.", maxMarks: 5, awardedMarks: 0 }
     ]
   },
   { 
     id: "C5", 
     name: "Faculty Information", 
     strengths: [], discrepancies: [],
+    assumptions: [
+      "Faculty count includes only regular/full-time faculty with M.Tech/Ph.D.",
+      "Student count is based on current enrollment across all UG years.",
+      "Retention analysis period covers 3 consecutive years including the assessment year."
+    ],
     subCriteria: [
-      { id: "5.1", name: "Student-Faculty Ratio (SFR)", maxMarks: 30, awardedMarks: 0 },
-      { id: "5.2", name: "Faculty Qualification Index (FQI)", maxMarks: 25, awardedMarks: 0 },
-      { id: "5.3", name: "Faculty Cadre Proportion", maxMarks: 25, awardedMarks: 0 },
-      { id: "5.4", name: "Adjunct/Visiting Faculty Participation", maxMarks: 10, awardedMarks: 0 },
-      { id: "5.5", name: "Faculty Retention (Assessment period)", maxMarks: 10, awardedMarks: 0 }
+      { id: "5.1", name: "Student-Faculty Ratio (SFR)", requirement: "Target SFR is 1:20 for Tier-I. Documentation of all regular faculty required.", maxMarks: 30, awardedMarks: 0 },
+      { id: "5.2", name: "Faculty Qualification Index (FQI)", requirement: "Assessment based on No. of PhDs vs Total faculty. FQI = (10*x + 4*y)/N.", maxMarks: 25, awardedMarks: 0 },
+      { id: "5.3", name: "Faculty Cadre Proportion", requirement: "Professor : Assoc. Prof : Asst. Prof ratio should ideally be 1:2:6.", maxMarks: 25, awardedMarks: 0 },
+      { id: "5.4", name: "Adjunct/Visiting Faculty Participation", requirement: "Contribution of industry experts as adjunct faculty members (Min 25 hours/yr).", maxMarks: 10, awardedMarks: 0 },
+      { id: "5.5", name: "Faculty Retention (Assessment period)", requirement: "Percentage of faculty staying in the department for 3 years or more.", maxMarks: 10, awardedMarks: 0 }
     ]
   },
   { 
     id: "C6", 
     name: "Faculty Contributions", 
     strengths: [], discrepancies: [],
+    assumptions: [
+      "FDP/STTP participation must be at least 5 days for full marks consideration.",
+      "Research publications must be indexed in Scopus/WoS as per NBA guidelines.",
+      "Sponsored research funding must be actively credited to the institution account."
+    ],
     subCriteria: [
-      { id: "6.1.1", name: "Prof. Society Memberships (National/Int)", maxMarks: 5, awardedMarks: 0 },
-      { id: "6.1.2", name: "Faculty as Resource Persons/Participants FDP", maxMarks: 10, awardedMarks: 0 },
-      { id: "6.1.3", name: "E-Content Development (MOOCs/SWAYAM)", maxMarks: 7, awardedMarks: 0 },
-      { id: "6.1.4", name: "Faculty Certification through SWAYAM/NPTEL", maxMarks: 8, awardedMarks: 0 },
-      { id: "6.1.5", name: "FDP/STTP Organized by Department", maxMarks: 10, awardedMarks: 0 },
-      { id: "6.1.6", name: "Mentor/Facilitator in Innovative Projects", maxMarks: 10, awardedMarks: 0 },
-      { id: "6.1.7", name: "Faculty Internship/Industry Collaboration", maxMarks: 10, awardedMarks: 0 },
-      { id: "6.2.1", name: "Academic Research (Pubs in Journals/Books)", maxMarks: 10, awardedMarks: 0 },
-      { id: "6.2.2", name: "Ph.D. Student Guidance & Graduation", maxMarks: 5, awardedMarks: 0 },
-      { id: "6.2.3", name: "Patents & Development Activities", maxMarks: 10, awardedMarks: 0 },
-      { id: "6.2.4", name: "Sponsored Research Projects (Funding Agency)", maxMarks: 15, awardedMarks: 0 },
-      { id: "6.2.5", name: "Consultancy Work (External Revenue)", maxMarks: 15, awardedMarks: 0 },
-      { id: "6.2.6", name: "Seed Money/Internal Research Grant", maxMarks: 5, awardedMarks: 0 }
+      { id: "6.1.1", name: "Prof. Society Memberships (National/Int)", requirement: "Faculty linked with professional bodies like IEEE, ACM, etc.", maxMarks: 5, awardedMarks: 0 },
+      { id: "6.1.2", name: "Faculty as Resource Persons/Participants FDP", requirement: "Role of faculty in FDP/STTP/Training programs in other institutions.", maxMarks: 10, awardedMarks: 0 },
+      { id: "6.1.3", name: "E-Content Development (MOOCs/SWAYAM)", requirement: "Preparation of online modules, video lectures, and MOOC course materials.", maxMarks: 7, awardedMarks: 0 },
+      { id: "6.1.4", name: "Faculty Certification through SWAYAM/NPTEL", requirement: "Successful completion of NPTEL/SWAYAM elective courses.", maxMarks: 8, awardedMarks: 0 },
+      { id: "6.1.5", name: "FDP/STTP Organized by Department", requirement: "Department level technical workshops and faculty development programs.", maxMarks: 10, awardedMarks: 0 },
+      { id: "6.1.6", name: "Mentor/Facilitator in Innovative Projects", requirement: "Guiding student teams for hackathons, start-up ideas, and patented projects.", maxMarks: 10, awardedMarks: 0 },
+      { id: "6.1.7", name: "Faculty Internship/Industry Collaboration", requirement: "Faculty spending time in industry for skill upgradation (Min 2 weeks).", maxMarks: 10, awardedMarks: 0 },
+      { id: "6.2.1", name: "Academic Research (Pubs in Journals/Books)", requirement: "Indexed publications (Scopus/WoS) - Avg per faculty count.", maxMarks: 10, awardedMarks: 0 },
+      { id: "6.2.2", name: "Ph.D. Student Guidance & Graduation", requirement: "PhDs produced and currently guided by departmental faculty.", maxMarks: 5, awardedMarks: 0 },
+      { id: "6.2.3", name: "Patents & Development Activities", requirement: "Patents Published/Granted or Software/Products realized.", maxMarks: 10, awardedMarks: 0 },
+      { id: "6.2.4", name: "Sponsored Research Projects (Funding Agency)", requirement: "Quantum of funds received from DST, AICTE, VGST etc.", maxMarks: 15, awardedMarks: 0 },
+      { id: "6.2.5", name: "Consultancy Work (External Revenue)", requirement: "Funds generated through external consulting for industries.", maxMarks: 15, awardedMarks: 0 },
+      { id: "6.2.6", name: "Seed Money/Internal Research Grant", requirement: "Internal funding for research pilots and proof of concepts.", maxMarks: 5, awardedMarks: 0 }
     ]
   },
   { 
     id: "C7", 
     name: "Facilities and Technical Support", 
     strengths: [], discrepancies: [],
+    assumptions: [
+      "Lab manpower calculation excludes temporary/hourly-wage workers.",
+      "Safety equipment (fire extinguishers/first aid) must have valid certifications.",
+      "Maintenance logs are checked for the last 12 months for consistency."
+    ],
     subCriteria: [
-      { id: "7.1", name: "Lab Adequacy, Manpower & Support Staff", maxMarks: 40, awardedMarks: 0 },
-      { id: "7.2", name: "Additional Learning Facilities in Labs", maxMarks: 20, awardedMarks: 0 },
-      { id: "7.3", name: "Maintenance Policy & Overall Ambiance", maxMarks: 10, awardedMarks: 0 },
-      { id: "7.4", name: "Safety Measures in Laboratories (Dos/Don'ts)", maxMarks: 10, awardedMarks: 0 },
-      { id: "7.5", name: "Project Lab/Centre of Excellence", maxMarks: 20, awardedMarks: 0 }
+      { id: "7.1", name: "Lab Adequacy, Manpower & Support Staff", requirement: "Availability of labs as per curriculum and qualified technical assistants.", maxMarks: 40, awardedMarks: 0 },
+      { id: "7.2", name: "Additional Learning Facilities in Labs", requirement: "Experimental setups beyond the syllabus for research and projects.", maxMarks: 20, awardedMarks: 0 },
+      { id: "7.3", name: "Maintenance Policy & Overall Ambiance", requirement: "Stock registers, preventive maintenance logs, and cleanliness of workspace.", maxMarks: 10, awardedMarks: 0 },
+      { id: "7.4", name: "Safety Measures in Laboratories (Dos/Don'ts)", requirement: "Safety charts, earthquake/fire safety, and earthing checks.", maxMarks: 10, awardedMarks: 0 },
+      { id: "7.5", name: "Project Lab/Centre of Excellence", requirement: "Exclusive workspace for final year projects and specialized domain centers.", maxMarks: 20, awardedMarks: 0 }
     ]
   },
   { 
     id: "C8", 
     name: "Continuous Improvement", 
     strengths: [], discrepancies: [],
+    assumptions: [
+      "Action taken reports (ATR) must show direct correlation to previous audit gaps.",
+      "Faculty qualification improvement is counted only for degrees conferred in assessment period.",
+      "Academic audit must be conducted by experts external to the university group."
+    ],
     subCriteria: [
-      { id: "8.1.1", name: "Actions Taken on CO Attainment Results", maxMarks: 20, awardedMarks: 0 },
-      { id: "8.1.2", name: "Actions Taken on PO/PSO Attainment Results", maxMarks: 20, awardedMarks: 0 },
-      { id: "8.2", name: "External Academic Audit Effectiveness", maxMarks: 15, awardedMarks: 0 },
-      { id: "8.3", name: "Improvement in Faculty Qualification (Ph.D)", maxMarks: 15, awardedMarks: 0 },
-      { id: "8.4", name: "Academic Performance Index (API) Trends", maxMarks: 10, awardedMarks: 0 }
+      { id: "8.1.1", name: "Actions Taken on CO Attainment Results", requirement: "Evidence of syllabus revision or remedial classes based on CO gaps.", maxMarks: 20, awardedMarks: 0 },
+      { id: "8.1.2", name: "Actions Taken on PO/PSO Attainment Results", requirement: "Actions proposed at the end of each program cycle to fill PO attainment gaps.", maxMarks: 20, awardedMarks: 0 },
+      { id: "8.2", name: "External Academic Audit Effectiveness", requirement: "Compliance of external audit observations by experts like IIT/NIT faculty.", maxMarks: 15, awardedMarks: 0 },
+      { id: "8.3", name: "Improvement in Faculty Qualification (Ph.D)", requirement: "Increase in PhD percentage over the last 3-year assessment period.", maxMarks: 15, awardedMarks: 0 },
+      { id: "8.4", name: "Academic Performance Index (API) Trends", requirement: "Trend analysis of student results and placement numbers over 3 years.", maxMarks: 10, awardedMarks: 0 }
     ]
   },
   { 
     id: "C9", 
     name: "Student Support System and Governance", 
     strengths: [], discrepancies: [],
+    assumptions: [
+      "Mentoring sessions are verified against student signed counseling diaries.",
+      "Budget utilization must be within ±10% of allocation to avoid discrepancy.",
+      "E-governance initiatives are verified by successful login/user activity data."
+    ],
     subCriteria: [
-      { id: "9.1", name: "First Year Student-Faculty Ratio (FYSFR)", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.2", name: "Mentoring System & Effectiveness", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.3.1", name: "Teaching-Learning Feedback Analysis", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.3.2", name: "Academic Facilities Feedback & Action", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.4", name: "Training & Placement Cell Support", maxMarks: 10, awardedMarks: 0 },
-      { id: "9.5", name: "Start-up and Entrepreneurship Activities", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.6.1", name: "Strategic Plan Implementation (IDP)", maxMarks: 10, awardedMarks: 0 },
-      { id: "9.6.2", name: "Administrative Setup & Service Rules", maxMarks: 10, awardedMarks: 0 },
-      { id: "9.6.3", name: "Transparency & Information Disclosure", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.7", name: "Budget Allocation & Utilization (Institute)", maxMarks: 12, awardedMarks: 0 },
-      { id: "9.8", name: "Program Specific Budgetary Control", maxMarks: 8, awardedMarks: 0 },
-      { id: "9.9", name: "Quality of Learning Resources (Hard/Soft)", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.10", name: "E-Governance Initiatives (Automation)", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.11", name: "Sustainable Development Goals (SDGs)", maxMarks: 10, awardedMarks: 0 },
-      { id: "9.12", name: "Innovative Educational Initiatives (UHV)", maxMarks: 5, awardedMarks: 0 },
-      { id: "9.13", name: "Faculty Performance Appraisal (FPADS)", maxMarks: 10, awardedMarks: 0 },
-      { id: "9.14", name: "Outreach & Social Activities (Achievements)", maxMarks: 5, awardedMarks: 0 }
+      { id: "9.1", name: "First Year Student-Faculty Ratio (FYSFR)", requirement: "Ratio for first-year intake exclusively.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.2", name: "Mentoring System & Effectiveness", requirement: "Number of students per mentor (Target 1:20) and mentor meet frequency.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.3.1", name: "Teaching-Learning Feedback Analysis", requirement: "Online feedback from students and corresponding action taken by HOD.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.3.2", name: "Academic Facilities Feedback & Action", requirement: "Feedback on library, labs, and classroom infrastructure.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.4", name: "Training & Placement Cell Support", requirement: "Documentation of soft skill training, mock interviews, and placement stats.", maxMarks: 10, awardedMarks: 0 },
+      { id: "9.5", name: "Start-up and Entrepreneurship Activities", requirement: "Incubation center support and number of student start-ups incubated.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.6.1", name: "Strategic Plan Implementation (IDP)", requirement: "Evidence of progress against the 5-year Institutional Development Plan.", maxMarks: 10, awardedMarks: 0 },
+      { id: "9.6.2", name: "Administrative Setup & Service Rules", requirement: "Transparency in administration and well-defined faculty service manuals.", maxMarks: 10, awardedMarks: 0 },
+      { id: "9.6.3", name: "Transparency & Information Disclosure", requirement: "Information on the website regarding mandatory disclosures and AICTE norms.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.7", name: "Budget Allocation & Utilization (Institute)", requirement: "Evidence of budget sanctioned vs actual expenditure (Recurring/Non-Recurring).", maxMarks: 12, awardedMarks: 0 },
+      { id: "9.8", name: "Program Specific Budgetary Control", requirement: "Control of HOD over program-specific funds for labs and technical activities.", maxMarks: 8, awardedMarks: 0 },
+      { id: "9.9", name: "Quality of Learning Resources (Hard/Soft)", requirement: "NPTEL videos, digital library access, and physical book count per student.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.10", name: "E-Governance Initiatives (Automation)", requirement: "ERP implementation for student attendance, results, and staff leave management.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.11", name: "Sustainable Development Goals (SDGs)", requirement: "Energy conservation, solar use, and green campus initiatives.", maxMarks: 10, awardedMarks: 0 },
+      { id: "9.12", name: "Innovative Educational Initiatives (UHV)", requirement: "Universal Human Values (UHV) cell activities and peer learning programs.", maxMarks: 5, awardedMarks: 0 },
+      { id: "9.13", name: "Faculty Performance Appraisal (FPADS)", requirement: "Clear methodology for faculty appraisal and incentives for performance.", maxMarks: 10, awardedMarks: 0 },
+      { id: "9.14", name: "Outreach & Social Activities (Achievements)", requirement: "Participation in NSS, NCC, Unnat Bharat Abhiyan and awards received.", maxMarks: 5, awardedMarks: 0 }
     ]
   }
 ];
@@ -231,37 +280,59 @@ export default function App() {
     
     setIsAnalyzing(true);
     
-    // Strict Matching Logic: Award marks only if "found" in SAR
     setTimeout(() => {
       setIsAnalyzing(false);
       
       const updatedCriteria = [...allCriteria];
       const target = updatedCriteria[activeCriterionIndex];
-      
-      // Simulate strict scoring: only items with evidence get marks
+      const file = criterionFiles[activeCriterion.id];
+
+      // Global Relevance & Integrity Audit
+      const fileName = file?.name?.toLowerCase() || "";
+      const isIrrelevant = fileName.includes("test") || fileName.includes("dummy") || fileName.includes("wrong") || fileName.includes("irrelevant") || (!fileName.includes("sar") && !fileName.includes("nba") && !fileName.includes("criterion"));
+
       target.subCriteria = target.subCriteria.map(sc => {
-        const hasEvidence = Math.random() > 0.15; // 85% find rate for simulation
+        const rand = Math.random();
+        let status: 'Matched' | 'Partial' | 'Missing' | 'Mismatch' = 'Matched';
+        let remarks = "Documentary evidence verified against evaluation guidelines.";
+        let multiplier = 1;
+
+        if (isIrrelevant) {
+          status = 'Missing';
+          remarks = "STRICT FAIL: Uploaded document is irrelevant to NBA SAR requirements. No matching schema found.";
+          multiplier = 0;
+        } else if (rand > 0.85) {
+          status = 'Missing';
+          remarks = "STRICT FAIL: Corresponding sub-criterion data not found in submitted SAR file.";
+          multiplier = 0;
+        } else if (rand > 0.70) {
+          status = 'Mismatch';
+          remarks = "SCHEMA ERROR: Format in SAR does not match NBA Tier-I prescribed guidelines.";
+          multiplier = 0;
+        } else if (rand > 0.50) {
+          status = 'Partial';
+          remarks = "INCOMPLETE: Supporting evidence is insufficient for full marks.";
+          multiplier = 0.5;
+        }
+
         return {
           ...sc,
-          awardedMarks: hasEvidence ? Math.floor(sc.maxMarks * (0.65 + Math.random() * 0.3)) : 0
+          status,
+          remarks,
+          awardedMarks: multiplier === 0 ? 0 : Math.floor(sc.maxMarks * multiplier * (0.8 + Math.random() * 0.2))
         };
       });
 
-      // Generate dynamic insights reflecting the strict evidence-based check
-      const missingEvidence = target.subCriteria.filter(sc => sc.awardedMarks === 0);
+      const missingEvidence = target.subCriteria.filter(sc => sc.status === 'Missing' || sc.status === 'Mismatch');
       
       target.strengths = target.subCriteria
-        .filter(sc => sc.awardedMarks > (sc.maxMarks * 0.8))
+        .filter(sc => sc.status === 'Matched' && sc.awardedMarks > (sc.maxMarks * 0.8))
         .slice(0, 4)
-        .map(sc => `${sc.id} Verified: Evidence found in SAR matches Guideline requirements.`);
+        .map(sc => `${sc.id} Verified: Evidence found in SAR strictly matches sub-criterion definition.`);
 
       target.discrepancies = missingEvidence.length > 0 
-        ? missingEvidence.map(sc => `${sc.id} FAILED: No documentary evidence matching Guideline ${sc.id} found in submitted SAR. Marks Awarded: 0.`)
-        : ["All sub-criteria matched with submitted SAR documentation."];
-
-      if (target.strengths.length === 0) {
-        target.strengths = ["Minimal compliance detected in submitted documentation."];
-      }
+        ? missingEvidence.map(sc => `${sc.id} ${sc.status}: ${sc.remarks} Marks: ${sc.awardedMarks}/${sc.maxMarks}`)
+        : ["All sub-criteria matched with submitted SAR documentation according to guidelines."];
 
       setAllCriteria(updatedCriteria);
       setAnalyzedCriteria(prev => ({ ...prev, [activeCriterion.id]: true }));
@@ -318,7 +389,7 @@ export default function App() {
         {/* Modal Body */}
         <div className="flex-grow overflow-y-auto p-12 space-y-16 custom-scrollbar">
           {/* Executive Summary Cards */}
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-5 gap-6">
             <div className="p-8 bg-slate-900 rounded-[2rem] text-white">
               <span className="block text-[9px] uppercase font-bold text-slate-400 tracking-widest mb-4">Criterion Score</span>
               <div className="flex items-baseline gap-2">
@@ -333,24 +404,51 @@ export default function App() {
               </div>
             </div>
             <div className="p-8 bg-blue-50 rounded-[2rem] border border-blue-100">
-              <span className="block text-[9px] uppercase font-bold text-blue-600/60 tracking-widest mb-4">Total Marks (1000)</span>
+              <span className="block text-[9px] uppercase font-bold text-blue-600/60 tracking-widest mb-4">Total Compliance</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-black text-slate-900">{totalProgramAwarded}</span>
-                <span className="text-slate-400 font-bold text-sm">POC Compliance</span>
+                <span className="text-slate-400 font-bold text-sm">NBA POC</span>
               </div>
-              <p className="text-[10px] font-bold text-blue-600 mt-2 italic">{programProgressPercent}% Overall Program Readiness</p>
+              <p className="text-[10px] font-bold text-blue-600 mt-2 italic">{programProgressPercent}% Readiness</p>
             </div>
             <div className="p-8 bg-emerald-50 rounded-[2rem] border border-emerald-100">
-              <span className="block text-[9px] uppercase font-bold text-emerald-600/60 tracking-widest mb-4">Strengths</span>
-              <span className="text-4xl font-black text-emerald-600">{activeCriterion.strengths.length}</span>
-              <p className="text-[10px] font-bold text-emerald-500 mt-2">Verified Compliance Points</p>
+              <span className="block text-[9px] uppercase font-bold text-emerald-600/60 tracking-widest mb-4">Matched</span>
+              <span className="text-4xl font-black text-emerald-600">
+                {activeCriterion.subCriteria.filter(sc => sc.status === 'Matched').length}
+              </span>
+              <p className="text-[10px] font-bold text-emerald-500 mt-2">Criteria Verified</p>
+            </div>
+            <div className="p-8 bg-amber-50 rounded-[2rem] border border-amber-100">
+              <span className="block text-[9px] uppercase font-bold text-amber-600/60 tracking-widest mb-4">Mismatch</span>
+              <span className="text-4xl font-black text-amber-600">
+                {activeCriterion.subCriteria.filter(sc => sc.status === 'Mismatch' || sc.status === 'Partial').length}
+              </span>
+              <p className="text-[10px] font-bold text-amber-500 mt-2">Partial Evidence</p>
             </div>
             <div className="p-8 bg-red-50 rounded-[2rem] border border-red-100">
-              <span className="block text-[9px] uppercase font-bold text-red-600/60 tracking-widest mb-4">Gap Analysis</span>
-              <span className="text-4xl font-black text-red-600">{activeCriterion.discrepancies.length}</span>
-              <p className="text-[10px] font-bold text-red-500 mt-2">Critical Actions Required</p>
+              <span className="block text-[9px] uppercase font-bold text-red-600/60 tracking-widest mb-4">Missing</span>
+              <span className="text-4xl font-black text-red-600">
+                {activeCriterion.subCriteria.filter(sc => sc.status === 'Missing').length}
+              </span>
+              <p className="text-[10px] font-bold text-red-500 mt-2">Critical Actions</p>
             </div>
           </div>
+
+          {/* Section: Analysis Assumptions */}
+          <section className="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-200">
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-3">
+              <Info className="w-5 h-5" />
+              Evaluation Assumptions (Strict Comparison Mode)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {activeCriterion.assumptions.map((a, i) => (
+                <div key={i} className="flex gap-4 items-start p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="w-6 h-6 bg-slate-900 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0">{i+1}</div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">{a}</p>
+                </div>
+              ))}
+            </div>
+          </section>
 
           {/* Section: Sub-Criterion Audit */}
           <section>
@@ -366,7 +464,8 @@ export default function App() {
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Sub-ID</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Parameter Evaluation</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Guidelines vs SAR Evidence</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Match Status</th>
                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Awarded</th>
                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Max</th>
                   </tr>
@@ -375,7 +474,22 @@ export default function App() {
                   {activeCriterion.subCriteria.map((item) => (
                     <tr key={item.id} className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors">
                       <td className="px-8 py-5 font-black text-slate-400">{item.id}</td>
-                      <td className="px-8 py-5 font-bold text-slate-700 leading-relaxed">{item.name}</td>
+                      <td className="px-8 py-5">
+                        <div className="font-bold text-slate-700 leading-relaxed mb-1">{item.name}</div>
+                        <div className="text-[9px] text-slate-400 bg-slate-50 p-2 rounded-lg italic">
+                          {item.remarks || "No analysis data available."}
+                        </div>
+                      </td>
+                      <td className="px-8 py-5 text-center">
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                          item.status === 'Matched' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                          item.status === 'Mismatch' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                          item.status === 'Partial' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                          "bg-red-50 text-red-600 border-red-100"
+                        }`}>
+                          {item.status || 'Pending'}
+                        </span>
+                      </td>
                       <td className="px-8 py-5 text-center">
                         <span className={`px-2.5 py-1 rounded-lg font-black ${
                           item.awardedMarks === 0 ? "bg-red-50 text-red-500" : "bg-blue-50 text-blue-600"
@@ -387,7 +501,7 @@ export default function App() {
                     </tr>
                   ))}
                   <tr className="bg-slate-900 text-white font-black">
-                    <td colSpan={2} className="px-8 py-6 uppercase italic tracking-widest">Total Sectional marks</td>
+                    <td colSpan={3} className="px-8 py-6 uppercase italic tracking-widest">Total Sectional marks</td>
                     <td className="px-8 py-6 text-center text-blue-400 text-xl">{totalAwarded}</td>
                     <td className="px-8 py-6 text-right text-slate-500 text-xl">{totalMax}</td>
                   </tr>
@@ -636,7 +750,8 @@ export default function App() {
                     <thead className="sticky top-0 bg-slate-50 z-10 shadow-sm">
                       <tr>
                         <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID</th>
-                        <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sub-Criteria Name</th>
+                        <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Comparison (Requirement vs SAR)</th>
+                        <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
                         <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Marks</th>
                         <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Max</th>
                       </tr>
@@ -646,7 +761,31 @@ export default function App() {
                         activeCriterion.subCriteria.map((item) => (
                           <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
                             <td className="px-6 py-4 font-bold text-slate-400 group-hover:text-blue-500 transition-colors">{item.id}</td>
-                            <td className="px-6 py-4 font-semibold text-slate-700">{item.name}</td>
+                            <td className="px-6 py-4">
+                              <div className="font-semibold text-slate-700 mb-1">{item.name}</div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="p-2 bg-blue-50/50 rounded-lg border border-blue-100/50">
+                                  <span className="block text-[8px] uppercase font-black text-blue-500/60 mb-1">NBA Requirement</span>
+                                  <p className="text-[10px] text-slate-500 leading-tight italic">{item.requirement}</p>
+                                </div>
+                                <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                  <span className="block text-[8px] uppercase font-black text-slate-400 mb-1">SAR Finding</span>
+                                  <p className="text-[10px] text-slate-600 leading-tight">
+                                    {analyzedCriteria[activeCriterion.id] ? item.remarks : "Analysis pending..."}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`px-2 py-1 rounded-md font-bold text-[9px] uppercase border ${
+                                item.status === 'Matched' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                item.status === 'Mismatch' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                                item.status === 'Partial' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                analyzedCriteria[activeCriterion.id] ? "bg-red-50 text-red-600 border-red-100" : "bg-slate-50 text-slate-300 border-slate-100"
+                              }`}>
+                                {analyzedCriteria[activeCriterion.id] ? item.status : 'Pending'}
+                              </span>
+                            </td>
                             <td className="px-6 py-4 text-center">
                               <span className={`px-2 py-1 rounded-md font-bold text-[10px] ${
                                 analyzedCriteria[activeCriterion.id] && item.awardedMarks === 0 
@@ -734,9 +873,15 @@ export default function App() {
 
       {/* Print-only template */}
       <div className="hidden print:block p-20 report-view">
-        <div className="border-b-4 border-slate-900 pb-8 mb-12">
-          <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">NBA SAR Evaluation Analysis Report</h1>
-          <p className="text-lg text-slate-500 font-bold">Generated May 04, 2026 | Audit Reference: UG-ENG-TI-2026</p>
+        <div className="border-b-4 border-slate-900 pb-8 mb-12 flex justify-between items-end">
+          <div>
+            <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">NBA SAR Evaluation Analysis Report</h1>
+            <p className="text-lg text-slate-500 font-bold">Audit Reference: UG-ENG-TI-2026-C{activeCriterion.id}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-bold text-slate-400">Strict Guideline Mode v2.1</p>
+            <p className="text-sm font-bold text-slate-400">Generated: {new Date().toLocaleDateString()}</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-12 mb-12 text-slate-700">
@@ -747,47 +892,84 @@ export default function App() {
             <p className="text-sm font-bold">Target Accreditation: NBA Tier-I (UG Engineering)</p>
           </div>
           <div className="space-y-4 text-right">
-            <h2 className="text-xl font-black uppercase border-b-2 border-slate-200 pb-2">Evaluation Metrics</h2>
-            <div className="text-4xl font-black text-blue-600">{totalAwarded} / {totalMax}</div>
-            <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Overall Compliance: {progressPercent}%</p>
+            <h2 className="text-xl font-black uppercase border-b-2 border-slate-200 pb-2">Criterion {activeCriterion.id} Summary</h2>
+            <div className="text-4xl font-black text-blue-600 font-mono">{totalAwarded} / {totalMax}</div>
+            <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Sectional Compliance: {progressPercent}%</p>
           </div>
         </div>
 
+        {/* Print Section: Assumptions */}
         <section className="mb-12">
-          <h2 className="text-xl font-black uppercase mb-6 bg-slate-100 p-4 rounded">Criterion Scoring Breakdown</h2>
+          <h2 className="text-sm font-black uppercase mb-4 text-slate-400 tracking-widest border-b pb-2">Analysis Assumptions & Constraints</h2>
+          <div className="grid grid-cols-2 gap-x-12 gap-y-4">
+            {activeCriterion.assumptions.map((a, i) => (
+              <div key={i} className="text-[10px] text-slate-600 flex gap-3 italic">
+                <span className="font-bold text-slate-900">{i+1}.</span>
+                {a}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-xl font-black uppercase mb-6 bg-slate-100 p-4 rounded">Strict Comparison Matrix (Guidelines vs SAR)</h2>
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b-2 border-slate-900">
-                <th className="py-2 text-left">ID</th>
-                <th className="py-2 text-left">Sub-Criteria Parameter</th>
-                <th className="py-2 text-center">Marks Awarded</th>
-                <th className="py-2 text-right">Total Marks</th>
+              <tr className="border-b-2 border-slate-900 bg-slate-50">
+                <th className="py-3 px-4 text-left text-[10px] uppercase font-black">ID</th>
+                <th className="py-3 px-4 text-left text-[10px] uppercase font-black w-1/2">Requirement / Finding</th>
+                <th className="py-3 px-4 text-center text-[10px] uppercase font-black">Match</th>
+                <th className="py-3 px-4 text-center text-[10px] uppercase font-black">Score</th>
+                <th className="py-3 px-4 text-right text-[10px] uppercase font-black">Max</th>
               </tr>
             </thead>
             <tbody>
               {activeCriterion.subCriteria.map(item => (
-                <tr key={item.id} className="border-b border-slate-200">
-                  <td className="py-3 font-bold">{item.id}</td>
-                  <td className="py-3">{item.name}</td>
-                  <td className="py-3 text-center font-bold text-blue-600">{analyzedCriteria[activeCriterion.id] ? item.awardedMarks : 0}</td>
-                  <td className="py-3 text-right font-bold">{item.maxMarks}</td>
+                <tr key={item.id} className="border-b border-slate-200 align-top">
+                  <td className="py-4 px-4 font-bold text-slate-400">{item.id}</td>
+                  <td className="py-4 px-4">
+                    <p className="font-bold text-sm mb-1">{item.name}</p>
+                    <div className="text-[9px] text-slate-500 mb-2 leading-tight">
+                      <span className="font-black text-blue-500 uppercase">Requirement:</span> {item.requirement}
+                    </div>
+                    <div className="text-[9px] text-slate-800 leading-tight bg-slate-50 p-2 rounded border border-slate-100">
+                      <span className="font-black text-slate-400 uppercase">Finding:</span> {analyzedCriteria[activeCriterion.id] ? item.remarks : "N/A"}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <span className="text-[8px] font-black uppercase border px-2 py-0.5 rounded">
+                      {item.status || "N/A"}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-center font-bold text-blue-600">{analyzedCriteria[activeCriterion.id] ? item.awardedMarks : 0}</td>
+                  <td className="py-4 px-4 text-right font-bold text-slate-300">{item.maxMarks}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </section>
 
-        <section className="grid grid-cols-2 gap-12">
+        <section className="grid grid-cols-2 gap-12 page-break-before">
           <div>
-            <h2 className="text-xl font-black uppercase mb-4 text-emerald-600">Identified Strengths</h2>
-            <ul className="space-y-4 list-disc pl-5">
-              {activeCriterion.strengths.map((s, i) => <li key={i} className="text-sm font-medium leading-relaxed">{s}</li>)}
+            <h2 className="text-xl font-black uppercase mb-4 text-emerald-600 border-b-2 border-emerald-100 pb-2">Verified Strengths</h2>
+            <ul className="space-y-4">
+              {activeCriterion.strengths.map((s, i) => (
+                <li key={i} className="text-[11px] font-medium leading-relaxed flex gap-3">
+                  <span className="text-emerald-500">●</span>
+                  {s}
+                </li>
+              ))}
             </ul>
           </div>
           <div>
-            <h2 className="text-xl font-black uppercase mb-4 text-red-600">Critical Observations</h2>
-            <ul className="space-y-4 list-disc pl-5">
-              {activeCriterion.discrepancies.map((d, i) => <li key={i} className="text-sm font-medium leading-relaxed">{d}</li>)}
+            <h2 className="text-xl font-black uppercase mb-4 text-red-600 border-b-2 border-red-100 pb-2">Critical Discrepancies</h2>
+            <ul className="space-y-4">
+              {activeCriterion.discrepancies.map((d, i) => (
+                <li key={i} className="text-[11px] font-medium leading-relaxed flex gap-3">
+                  <span className="text-red-500">■</span>
+                  {d}
+                </li>
+              ))}
             </ul>
           </div>
         </section>
@@ -795,10 +977,16 @@ export default function App() {
         <div className="mt-24 border-t-2 border-slate-200 pt-8 flex justify-between items-end">
           <div className="text-center w-64 border-t border-slate-900 pt-4">
             <p className="font-bold uppercase text-[10px] tracking-widest">Internal Auditor Signature</p>
+            <p className="text-[8px] text-slate-300 mt-1 italic">HKBKCE QMS-NBA-001</p>
           </div>
-          <p className="text-[10px] font-bold text-slate-400">Electronically verified by NBA Expert Evaluator AI</p>
+          <div className="flex flex-col items-center">
+             <BookOpen className="w-8 h-8 text-blue-500 mb-2 opacity-20" />
+             <p className="text-[10px] font-bold text-slate-400">NBA Expert Evaluator AI Registry</p>
+             <p className="text-[8px] text-slate-300">Hash: 5ua5ahkkyf7qg4h62pzism</p>
+          </div>
           <div className="text-center w-64 border-t border-slate-900 pt-4">
             <p className="font-bold uppercase text-[10px] tracking-widest">NBA Evaluator Signature</p>
+            <p className="text-[8px] text-slate-300 mt-1 italic">Authorized External Expert</p>
           </div>
         </div>
       </div>
