@@ -47,94 +47,280 @@ const StatCard = ({ title, value, label, subtitle, color }: { title: string, val
 
 export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
   const [activeTab, setActiveTab] = useState('summary');
-  const [facultyList, setFacultyList] = useState<FacultyEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const deleteFaculty = (sn: number) => {
-    setFacultyList(prev => prev.filter(f => f.sn !== sn).map((f, i) => ({ ...f, sn: i + 1 })));
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastRecalculated, setLastRecalculated] = useState<string | null>(null);
+  const isInitialMount = useRef(true);
+
+  // 3 separate lists for CAY, CAYm1, CAYm2 (Represent user uploads)
+  const [cayFacultyList, setCayFacultyList] = useState<FacultyEntry[]>([]);
+  const [caym1FacultyList, setCaym1FacultyList] = useState<FacultyEntry[]>([]);
+  const [caym2FacultyList, setCaym2FacultyList] = useState<FacultyEntry[]>([]);
+
+  // 3 calculation lists that update only when clicking the "Recalculate" button
+  const [calcCayFacultyList, setCalcCayFacultyList] = useState<FacultyEntry[]>([]);
+  const [calcCaym1FacultyList, setCalcCaym1FacultyList] = useState<FacultyEntry[]>([]);
+  const [calcCaym2FacultyList, setCalcCaym2FacultyList] = useState<FacultyEntry[]>([]);
+
+  const [cayUploadedFileName, setCayUploadedFileName] = useState<string | null>(null);
+  const [caym1UploadedFileName, setCaym1UploadedFileName] = useState<string | null>(null);
+  const [caym2UploadedFileName, setCaym2UploadedFileName] = useState<string | null>(null);
+
+  const [selectedDirectoryYear, setSelectedDirectoryYear] = useState<'cay' | 'caym1' | 'caym2'>('cay');
+
+  const cayFileInputRef = useRef<HTMLInputElement>(null);
+  const caym1FileInputRef = useRef<HTMLInputElement>(null);
+  const caym2FileInputRef = useRef<HTMLInputElement>(null);
+
+  const getFacultyListForYear = (year: string) => {
+    if (year.includes('CAYm1')) return caym1FacultyList;
+    if (year.includes('CAYm2')) return caym2FacultyList;
+    return cayFacultyList; // Default to CAY
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const getCalcFacultyListForYear = (year: string) => {
+    if (year.includes('CAYm1')) return calcCaym1FacultyList;
+    if (year.includes('CAYm2')) return calcCaym2FacultyList;
+    return calcCayFacultyList;
+  };
+
+  const getFacultyList = () => {
+    if (selectedDirectoryYear === 'caym1') return caym1FacultyList;
+    if (selectedDirectoryYear === 'caym2') return caym2FacultyList;
+    return cayFacultyList;
+  };
+
+  const getCalcFacultyList = () => {
+    if (selectedDirectoryYear === 'caym1') return calcCaym1FacultyList;
+    if (selectedDirectoryYear === 'caym2') return calcCaym2FacultyList;
+    return calcCayFacultyList;
+  };
+
+  const getSetFacultyList = () => {
+    if (selectedDirectoryYear === 'caym1') return setCaym1FacultyList;
+    if (selectedDirectoryYear === 'caym2') return setCaym2FacultyList;
+    return setCayFacultyList;
+  };
+
+  const deleteFaculty = (sn: number) => {
+    const listSetter = getSetFacultyList();
+    listSetter(prev => prev.filter(f => f.sn !== sn).map((f, i) => ({ ...f, sn: i + 1 })));
+    setIsDirty(true);
+  };
+
+  const resetRosterToDefault = (yearKey: 'cay' | 'caym1' | 'caym2') => {
+    if (yearKey === 'cay') {
+      setCayFacultyList([]);
+      setCayUploadedFileName(null);
+    } else if (yearKey === 'caym1') {
+      setCaym1FacultyList([]);
+      setCaym1UploadedFileName(null);
+    } else if (yearKey === 'caym2') {
+      setCaym2FacultyList([]);
+      setCaym2UploadedFileName(null);
+    }
+    setUploadStatus({
+      type: 'success',
+      message: `Cleared faculty roster and inputs for ${yearKey.toUpperCase()}.`
+    });
+    setIsDirty(true);
+  };
+
+  const handleFileUploadForYear = (event: React.ChangeEvent<HTMLInputElement>, yearKey: 'cay' | 'caym1' | 'caym2') => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const accumulatedFaculty: FacultyEntry[] = [];
-    let processedCount = 0;
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result;
+        if (!result) throw new Error("Could not read file results.");
 
-    Array.from(files).forEach((item) => {
-      const file = item as File;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[];
-          
-          const newFaculty: FacultyEntry[] = jsonData.slice(1)
-            .filter(row => row && row.length > 0 && row[1]) 
-            .map((row, index) => {
-              return {
-                sn: index + 1,
-                name: String(row[1] || 'Unknown').trim(),
-                pan: String(row[2] || '').trim(),
-                degree: String(row[3] || '').trim(),
-                university: String(row[4] || '').trim(),
-                specialization: String(row[5] || '').trim(),
-                joiningDate: String(row[6] || '').trim(),
-                experience: parseFloat(row[7]) || 0,
-                joiningDesignation: String(row[8] || '').trim(),
-                presentDesignation: String(row[9] || '').trim(),
-                nature: String(row[10] || 'Regular').trim(),
-                currentlyAssociated: String(row[11])?.toLowerCase().startsWith('y') || row[11] === "" || true,
-              };
-            });
-          accumulatedFaculty.push(...newFaculty);
-        } catch (err) {
-          console.error("Error reading file", file.name, err);
+        const data = new Uint8Array(result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          throw new Error("No sheets found in the uploaded Excel workbook.");
         }
+
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[];
         
-        processedCount++;
-        if (processedCount === files.length) {
-          setFacultyList(prev => {
-            const combined = [...prev, ...accumulatedFaculty];
-            return combined.map((f, i) => ({ ...f, sn: i + 1 }));
-          });
+        if (!jsonData || jsonData.length === 0) {
+          throw new Error(`The sheet "${firstSheetName}" is empty.`);
         }
-      };
-      reader.readAsArrayBuffer(file);
-    });
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+        // Detect column mapping dynamically (same robust detection)
+        let headerRowIndex = 0;
+        let colIdxs = {
+          sn: 0,
+          name: 1,
+          pan: 2,
+          degree: 3,
+          university: 4,
+          specialization: 5,
+          joiningDate: 6,
+          experience: 7,
+          joiningDesignation: 8,
+          presentDesignation: 9,
+          nature: 10,
+          currentlyAssociated: 11
+        };
+
+        for (let r = 0; r < Math.min(jsonData.length, 20); r++) {
+          const row = jsonData[r];
+          if (row && Array.isArray(row)) {
+            const rowStr = row.map(cell => String(cell || '').toLowerCase().trim());
+            const hasName = rowStr.some(c => c.includes('name'));
+            const hasDegree = rowStr.some(c => c.includes('degree') || c.includes('qualification') || c.includes('phd') || c.includes('ph.d'));
+            const hasExp = rowStr.some(c => c.includes('exp') || c.includes('experience'));
+            
+            if (hasName && (hasDegree || hasExp)) {
+              headerRowIndex = r;
+              rowStr.forEach((val, cIdx) => {
+                if (val.includes('sn') || val.includes('s.n') || val === 'sno' || val === 's.no' || val === 'serial') {
+                  colIdxs.sn = cIdx;
+                } else if (val.includes('name') || val.includes('faculty') || val.includes('member') || val.includes('prof')) {
+                  colIdxs.name = cIdx;
+                } else if (val.includes('pan')) {
+                  colIdxs.pan = cIdx;
+                } else if (val.includes('degree') || val.includes('qualification') || val.includes('highest')) {
+                  colIdxs.degree = cIdx;
+                } else if (val.includes('univ') || val.includes('college') || val.includes('institute')) {
+                  colIdxs.university = cIdx;
+                } else if (val.includes('spec') || val.includes('dept') || val.includes('branch') || val.includes('subject')) {
+                  colIdxs.specialization = cIdx;
+                } else if (val.includes('joining date') || val.includes('doj')) {
+                  colIdxs.joiningDate = cIdx;
+                } else if (val.includes('exp') || val.includes('year')) {
+                  colIdxs.experience = cIdx;
+                } else if (val.includes('joining des') || val.includes('designation at joining')) {
+                  colIdxs.joiningDesignation = cIdx;
+                } else if (val.includes('present des') || val.includes('current des') || val.includes('present designation') || val.includes('current designation') || val.includes('role') || val.includes('designation')) {
+                  colIdxs.presentDesignation = cIdx;
+                } else if (val.includes('nature') || val.includes('type') || val.includes('association') || val.includes('status')) {
+                  colIdxs.nature = cIdx;
+                } else if (val.includes('currently') || val.includes('associated') || val.includes('active') || val.includes('yes/no') || val.includes('y/n')) {
+                  colIdxs.currentlyAssociated = cIdx;
+                }
+              });
+              break;
+            }
+          }
+        }
+
+        const startIndex = headerRowIndex !== -1 ? headerRowIndex + 1 : 1;
+        const dataRows = jsonData.slice(startIndex);
+
+        const newFaculty: FacultyEntry[] = dataRows
+          .filter(row => row && row.length > 0 && row[colIdxs.name])
+          .map((row, index) => {
+            const getCellStr = (idx: number, def = '') => {
+              const val = row[idx];
+              if (val === undefined || val === null) return def;
+              return String(val).trim();
+            };
+
+            const rawExp = row[colIdxs.experience];
+            let parsedExp = 0;
+            if (rawExp !== undefined && rawExp !== null) {
+              parsedExp = parseFloat(rawExp);
+              if (isNaN(parsedExp)) parsedExp = 0;
+            }
+
+            // Determine association status
+            const assocCellStr = getCellStr(colIdxs.currentlyAssociated).toLowerCase();
+            let curAssoc = true;
+            if (assocCellStr && (assocCellStr.startsWith('n') || assocCellStr === 'no')) {
+              curAssoc = false;
+            }
+
+            return {
+              sn: index + 1,
+              name: getCellStr(colIdxs.name, 'Unknown Faculty'),
+              pan: getCellStr(colIdxs.pan),
+              degree: getCellStr(colIdxs.degree),
+              university: getCellStr(colIdxs.university),
+              specialization: getCellStr(colIdxs.specialization),
+              joiningDate: getCellStr(colIdxs.joiningDate),
+              experience: parsedExp,
+              joiningDesignation: getCellStr(colIdxs.joiningDesignation),
+              presentDesignation: getCellStr(colIdxs.presentDesignation, 'Assistant Professor'),
+              nature: getCellStr(colIdxs.nature, 'Regular'),
+              currentlyAssociated: curAssoc,
+            };
+          });
+
+        if (newFaculty.length === 0) {
+          throw new Error(`Could not extract any valid faculty rows. Please make sure that column headers are correctly matching on the sheet.`);
+        }
+
+        if (yearKey === 'cay') {
+          setCayFacultyList(newFaculty);
+          setCayUploadedFileName(file.name);
+        } else if (yearKey === 'caym1') {
+          setCaym1FacultyList(newFaculty);
+          setCaym1UploadedFileName(file.name);
+        } else if (yearKey === 'caym2') {
+          setCaym2FacultyList(newFaculty);
+          setCaym2UploadedFileName(file.name);
+        }
+
+        setUploadStatus({
+          type: 'success',
+          message: `File Uploaded successfully! "${file.name}" loaded for ${yearKey.toUpperCase()}: ${newFaculty.length} faculty entries compiled. Click "Recalculate Criterion 5" to compute updated scores.`
+        });
+        setIsDirty(true);
+
+        // Switch to the 'faculty' tab and select this year to view
+        setActiveTab('faculty');
+        setSelectedDirectoryYear(yearKey);
+
+        setTimeout(() => setUploadStatus(null), 8000);
+      } catch (err: any) {
+        console.error("Error reading file", file.name, err);
+        setUploadStatus({
+          type: 'error',
+          message: `Upload failed for ${yearKey.toUpperCase()}: ${err?.message || 'Invalid format'}`
+        });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+
+    // Reset file input value
+    event.target.value = '';
   };
 
   const calculateSFR = (data: YearData) => {
-    if (facultyList.length === 0) return "0.00";
-    return (data.students / facultyList.length).toFixed(2);
+    const list = getCalcFacultyListForYear(data.year);
+    if (list.length === 0) return "0.00";
+    return (data.students / list.length).toFixed(2);
   };
   
   const calculateFQI = (data: YearData) => {
-    if (facultyList.length === 0) return "0.00";
+    const list = getCalcFacultyListForYear(data.year);
+    if (list.length === 0) return "0.00";
     const rf = data.students / 20;
-    const phds = facultyList.filter(f => f.degree.toLowerCase().includes('ph.d') || f.degree.toLowerCase().includes('phd')).length;
-    const masters = facultyList.filter(f => f.degree.toLowerCase().includes('m.tech') || f.degree.toLowerCase().includes('me') || f.degree.toLowerCase().includes('master')).length;
+    const phds = list.filter(f => f.degree.toLowerCase().includes('ph.d') || f.degree.toLowerCase().includes('phd')).length;
+    const masters = list.filter(f => f.degree.toLowerCase().includes('m.tech') || f.degree.toLowerCase().includes('me') || f.degree.toLowerCase().includes('master')).length;
     return (2.5 * ((10 * phds + 4 * masters) / rf)).toFixed(2);
   };
 
   const calculateCadre = (data: YearData) => {
-    if (facultyList.length === 0) return "0.00";
+    const list = getCalcFacultyListForYear(data.year);
+    if (list.length === 0) return "0.00";
     const rfTotal = data.students / 20;
     const rf1 = (1/9) * rfTotal;
     const rf2 = (2/9) * rfTotal;
     const rf3 = (6/9) * rfTotal;
     
-    const profs = facultyList.filter(f => f.presentDesignation.toLowerCase().includes('prof') && !f.presentDesignation.toLowerCase().includes('assoc')).length;
-    const assocProfs = facultyList.filter(f => f.presentDesignation.toLowerCase().includes('assoc')).length;
-    const asstProfs = facultyList.filter(f => f.presentDesignation.toLowerCase().includes('asst')).length;
+    const profs = list.filter(f => f.presentDesignation.toLowerCase().includes('prof') && !f.presentDesignation.toLowerCase().includes('assoc')).length;
+    const assocProfs = list.filter(f => f.presentDesignation.toLowerCase().includes('assoc')).length;
+    const asstProfs = list.filter(f => f.presentDesignation.toLowerCase().includes('asst')).length;
 
     const marks = (
       (Math.min(profs / rf1, 1)) + 
@@ -146,10 +332,11 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
   };
 
   const calculateRetention = (data: YearData) => {
-    if (facultyList.length === 0) return "0.00";
+    const list = getCalcFacultyListForYear(data.year);
+    if (list.length === 0) return "0.00";
     
-    const stayingMoreThan3 = facultyList.filter(f => f.experience >= 3).length;
-    const total = facultyList.length;
+    const stayingMoreThan3 = list.filter(f => f.experience >= 3).length;
+    const total = list.length;
     const percentage = (stayingMoreThan3 / total) * 100;
     
     if (percentage >= 85) return "10.00";
@@ -159,12 +346,13 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
     return "2.00";
   };
 
-  const averageSFR = facultyList.length === 0 ? "0.00" : (NBA_DATA.reduce((acc, curr) => acc + parseFloat(calculateSFR(curr)), 0) / 3).toFixed(2);
-  const averageFQI = facultyList.length === 0 ? "0.00" : (NBA_DATA.reduce((acc, curr) => acc + parseFloat(calculateFQI(curr)), 0) / 3).toFixed(2);
-  const averageCadre = facultyList.length === 0 ? "0.00" : (NBA_DATA.reduce((acc, curr) => acc + parseFloat(calculateCadre(curr)), 0) / 3).toFixed(2);
-  const averageRetention = facultyList.length === 0 ? "0.00" : (NBA_DATA.reduce((acc, curr) => acc + parseFloat(calculateRetention(curr)), 0) / 3).toFixed(2);
+  const averageSFR = (NBA_DATA.reduce((acc, curr) => acc + parseFloat(calculateSFR(curr)), 0) / 3).toFixed(2);
+  const averageFQI = (NBA_DATA.reduce((acc, curr) => acc + parseFloat(calculateFQI(curr)), 0) / 3).toFixed(2);
+  const averageCadre = (NBA_DATA.reduce((acc, curr) => acc + parseFloat(calculateCadre(curr)), 0) / 3).toFixed(2);
+  const averageRetention = (NBA_DATA.reduce((acc, curr) => acc + parseFloat(calculateRetention(curr)), 0) / 3).toFixed(2);
 
-  const filteredFaculty = facultyList.filter(f => 
+  const activeFacultyList = getFacultyList();
+  const filteredFaculty = activeFacultyList.filter(f => 
     f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     f.degree.toLowerCase().includes(searchQuery.toLowerCase()) ||
     f.presentDesignation.toLowerCase().includes(searchQuery.toLowerCase())
@@ -185,17 +373,113 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
   const onCalculateResultsRef = useRef(onCalculateResults);
   onCalculateResultsRef.current = onCalculateResults;
 
-  // Sync results with the parent application
+  // Sync results with the parent application only on initial mount
   useEffect(() => {
-    if (onCalculateResultsRef.current) {
-      onCalculateResultsRef.current({
-        SFR: parseFloat(averageSFR),
-        FQI: parseFloat(averageFQI),
-        Cadre: parseFloat(averageCadre),
-        Retention: parseFloat(averageRetention)
-      }, facultyList.length > 0);
+    if (isInitialMount.current) {
+      if (onCalculateResultsRef.current) {
+        onCalculateResultsRef.current({
+          SFR: parseFloat(averageSFR),
+          FQI: parseFloat(averageFQI),
+          Cadre: parseFloat(averageCadre),
+          Retention: parseFloat(averageRetention)
+        }, calcCayFacultyList.length > 0 || calcCaym1FacultyList.length > 0 || calcCaym2FacultyList.length > 0);
+      }
+      isInitialMount.current = false;
     }
-  }, [averageSFR, averageFQI, averageCadre, averageRetention, facultyList.length]);
+  }, [averageSFR, averageFQI, averageCadre, averageRetention, calcCayFacultyList.length, calcCaym1FacultyList.length, calcCaym2FacultyList.length]);
+
+  const triggerRecalculation = () => {
+    setIsRecalculating(true);
+    setUploadStatus(null);
+    
+    setTimeout(() => {
+      // Sync calculation states with new uploaded list states
+      setCalcCayFacultyList(cayFacultyList);
+      setCalcCaym1FacultyList(caym1FacultyList);
+      setCalcCaym2FacultyList(caym2FacultyList);
+
+      const localGetCalcList = (yr: string) => {
+        if (yr.includes('CAYm1')) return caym1FacultyList;
+        if (yr.includes('CAYm2')) return caym2FacultyList;
+        return cayFacultyList;
+      };
+
+      const localCalcSFR = (data: YearData) => {
+        const list = localGetCalcList(data.year);
+        if (list.length === 0) return 0;
+        return data.students / list.length;
+      };
+
+      const localCalcFQI = (data: YearData) => {
+        const list = localGetCalcList(data.year);
+        if (list.length === 0) return 0;
+        const rf = data.students / 20;
+        const phds = list.filter(f => f.degree.toLowerCase().includes('ph.d') || f.degree.toLowerCase().includes('phd')).length;
+        const masters = list.filter(f => f.degree.toLowerCase().includes('m.tech') || f.degree.toLowerCase().includes('me') || f.degree.toLowerCase().includes('master')).length;
+        return 2.5 * ((10 * phds + 4 * masters) / rf);
+      };
+
+      const localCalcCadre = (data: YearData) => {
+        const list = localGetCalcList(data.year);
+        if (list.length === 0) return 0;
+        const rfTotal = data.students / 20;
+        const rf1 = (1/9) * rfTotal;
+        const rf2 = (2/9) * rfTotal;
+        const rf3 = (6/9) * rfTotal;
+        
+        const profs = list.filter(f => f.presentDesignation.toLowerCase().includes('prof') && !f.presentDesignation.toLowerCase().includes('assoc')).length;
+        const assocProfs = list.filter(f => f.presentDesignation.toLowerCase().includes('assoc')).length;
+        const asstProfs = list.filter(f => f.presentDesignation.toLowerCase().includes('asst')).length;
+
+        const marks = (
+          (Math.min(profs / rf1, 1)) + 
+          (Math.min(assocProfs / rf2, 1) * 0.6) + 
+          (Math.min(asstProfs / rf3, 1) * 0.4)
+        ) * 12.5;
+        
+        return Math.min(marks, 25);
+      };
+
+      const localCalcRetention = (data: YearData) => {
+        const list = localGetCalcList(data.year);
+        if (list.length === 0) return 0;
+        
+        const stayingMoreThan3 = list.filter(f => f.experience >= 3).length;
+        const total = list.length;
+        const percentage = (stayingMoreThan3 / total) * 100;
+        
+        if (percentage >= 85) return 10;
+        if (percentage >= 75) return 8;
+        if (percentage >= 65) return 6;
+        if (percentage >= 55) return 4;
+        return 2;
+      };
+
+      const freshSFR = (NBA_DATA.reduce((acc, curr) => acc + localCalcSFR(curr), 0) / 3).toFixed(2);
+      const freshFQI = (NBA_DATA.reduce((acc, curr) => acc + localCalcFQI(curr), 0) / 3).toFixed(2);
+      const freshCadre = (NBA_DATA.reduce((acc, curr) => acc + localCalcCadre(curr), 0) / 3).toFixed(2);
+      const freshRetention = (NBA_DATA.reduce((acc, curr) => acc + localCalcRetention(curr), 0) / 3).toFixed(2);
+
+      if (onCalculateResultsRef.current) {
+        onCalculateResultsRef.current({
+          SFR: parseFloat(freshSFR),
+          FQI: parseFloat(freshFQI),
+          Cadre: parseFloat(freshCadre),
+          Retention: parseFloat(freshRetention)
+        }, cayFacultyList.length > 0 || caym1FacultyList.length > 0 || caym2FacultyList.length > 0);
+      }
+      
+      const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setLastRecalculated(timeString);
+      setIsDirty(false);
+      setIsRecalculating(false);
+      
+      setUploadStatus({
+        type: 'success',
+        message: `Criterion 5 evaluation complete! All parameters (SFR, FQI, Cadre & Retention) compiled at ${timeString} with ${cayFacultyList.length + caym1FacultyList.length + caym2FacultyList.length} total active roster members.`
+      });
+    }, 1200);
+  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -217,30 +501,243 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
             <Download size={14} />
             Template
           </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-            accept=".csv, .xlsx, .xls" 
-            multiple
-            className="hidden"
-          />
-          <button 
+        </div>
+      </div>
+
+      {/* Roster Upload Control Center */}
+      <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
+              <Upload size={14} className="text-blue-600" />
+              Academic Year Excel Upload Center
+            </h3>
+            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Initialize or override faculty rosters for evaluation years independently.</p>
+          </div>
+          <span className="text-[10px] bg-blue-50 text-blue-700 font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-blue-100">
+            3-Year Consolidated Auditing
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* CAY Upload Slot */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 relative group flex flex-col justify-between hover:border-blue-400 transition-all shadow-sm">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-black text-blue-600 tracking-wider">CAY (Current Year)</span>
+                <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">2025-26</span>
+              </div>
+              <div className="text-lg font-black text-slate-800">{cayFacultyList.length} Faculty</div>
+              <div className="text-[10px] text-slate-400 font-medium mt-1 mb-4">
+                {cayUploadedFileName ? (
+                  <span className="text-emerald-600 font-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 size={11} className="mt-0.5 shrink-0" />
+                    File: {cayUploadedFileName}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-semibold italic">No roster uploaded yet (Empty)</span>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <input 
+                type="file" 
+                ref={cayFileInputRef} 
+                onChange={(e) => handleFileUploadForYear(e, 'cay')} 
+                accept=".csv, .xlsx, .xls"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => cayFileInputRef.current?.click()}
+                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-extrabold text-[10px] uppercase tracking-wider transition-all border border-blue-200 cursor-pointer text-center"
+              >
+                Upload Excel
+              </button>
+              {(cayUploadedFileName || cayFacultyList.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => resetRosterToDefault('cay')}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all border border-slate-200 cursor-pointer"
+                  title="Clear roster data"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* CAYm1 Upload Slot */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 relative group flex flex-col justify-between hover:border-blue-400 transition-all shadow-sm">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-black text-blue-600 tracking-wider">CAYm1 (Year - 1)</span>
+                <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">2024-25</span>
+              </div>
+              <div className="text-lg font-black text-slate-800">{caym1FacultyList.length} Faculty</div>
+              <div className="text-[10px] text-slate-400 font-medium mt-1 mb-4">
+                {caym1UploadedFileName ? (
+                  <span className="text-emerald-600 font-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 size={11} className="mt-0.5 shrink-0" />
+                    File: {caym1UploadedFileName}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-semibold italic">No roster uploaded yet (Empty)</span>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <input 
+                type="file" 
+                ref={caym1FileInputRef} 
+                onChange={(e) => handleFileUploadForYear(e, 'caym1')} 
+                accept=".csv, .xlsx, .xls"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => caym1FileInputRef.current?.click()}
+                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-extrabold text-[10px] uppercase tracking-wider transition-all border border-blue-200 cursor-pointer text-center"
+              >
+                Upload Excel
+              </button>
+              {(caym1UploadedFileName || caym1FacultyList.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => resetRosterToDefault('caym1')}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all border border-slate-200 cursor-pointer"
+                  title="Clear roster data"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* CAYm2 Upload Slot */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 relative group flex flex-col justify-between hover:border-blue-400 transition-all shadow-sm">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-black text-blue-600 tracking-wider">CAYm2 (Year - 2)</span>
+                <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">2023-24</span>
+              </div>
+              <div className="text-lg font-black text-slate-800">{caym2FacultyList.length} Faculty</div>
+              <div className="text-[10px] text-slate-400 font-medium mt-1 mb-4">
+                {caym2UploadedFileName ? (
+                  <span className="text-emerald-600 font-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 size={11} className="mt-0.5 shrink-0" />
+                    File: {caym2UploadedFileName}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-semibold italic">No roster uploaded yet (Empty)</span>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <input 
+                type="file" 
+                ref={caym2FileInputRef} 
+                onChange={(e) => handleFileUploadForYear(e, 'caym2')} 
+                accept=".csv, .xlsx, .xls"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => caym2FileInputRef.current?.click()}
+                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-extrabold text-[10px] uppercase tracking-wider transition-all border border-blue-200 cursor-pointer text-center"
+              >
+                Upload Excel
+              </button>
+              {(caym2UploadedFileName || caym2FacultyList.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => resetRosterToDefault('caym2')}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all border border-slate-200 cursor-pointer"
+                  title="Clear roster data"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Recalculate Footer Panel */}
+        <div className="mt-6 pt-5 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 ${isDirty ? 'bg-amber-100' : 'bg-emerald-100'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${isDirty ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+            </div>
+            <div>
+              <div className="text-xs font-black text-slate-700 flex items-center gap-1.5 leading-none">
+                {isDirty ? 'Roster changes detected!' : 'Evaluation scores up to date.'}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1 font-semibold leading-normal">
+                {isDirty 
+                  ? 'Please click "Recalculate Criterion 5" to analyze uploaded profiles and rebuild NBA marks.'
+                  : lastRecalculated 
+                    ? `Audit completed successfully. Last verified at ${lastRecalculated}.` 
+                    : 'Audited values verified with current baseline faculty database.'}
+              </p>
+            </div>
+          </div>
+          
+          <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg pointer-events-auto cursor-pointer"
+            disabled={isRecalculating}
+            onClick={triggerRecalculation}
+            className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer shadow-md select-none border min-w-[210px] ${
+              isDirty 
+                ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-500 active:scale-95 shadow-blue-100' 
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
+            }`}
           >
-            <Upload size={14} />
-            Excel Upload
+            {isRecalculating ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-current shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Auditing Profiles...
+              </>
+            ) : (
+              <>
+                <Calculator size={13} strokeWidth={2.5} className="shrink-0" />
+                Recalculate Criterion 5
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Upload status message */}
+      {uploadStatus && (
+        <div className={`p-4 rounded-2xl border flex items-start gap-3 text-xs leading-relaxed transition-all ${
+          uploadStatus.type === 'success' 
+            ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+            : 'bg-rose-50 text-rose-950 border-rose-200'
+        }`}>
+          <div className="mt-0.5 shrink-0">
+            <CheckCircle2 size={16} className={uploadStatus.type === 'success' ? 'text-emerald-600' : 'text-rose-500'} />
+          </div>
+          <div className="flex-1 font-bold">
+            {uploadStatus.message}
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setUploadStatus(null)}
+            className="text-slate-400 hover:text-slate-600 font-bold ml-auto cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Tabs navigation */}
       <div className="flex border-b border-slate-200 overflow-x-auto gap-2 pb-0 pt-2 custom-scrollbar">
         {[
           { id: 'summary', icon: LayoutDashboard, label: 'Overview' },
-          { id: 'faculty', icon: Users, label: `Faculty Roster (${facultyList.length})` },
+          { id: 'faculty', icon: Users, label: `Faculty Roster (${cayFacultyList.length + caym1FacultyList.length + caym2FacultyList.length})` },
           { id: '5.1', icon: Ratio, label: '5.1 SFR' },
           { id: '5.2', icon: GraduationCap, label: '5.2 FQI' },
           { id: '5.3', icon: UserCheck, label: '5.3 Cadre' },
@@ -297,7 +794,7 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-8 py-4 font-bold text-slate-900">{data.year}</td>
                       <td className="px-8 py-4 text-center font-bold text-slate-600">{data.students}</td>
-                      <td className="px-8 py-4 text-center font-bold text-slate-600">{facultyList.length}</td>
+                      <td className="px-8 py-4 text-center font-bold text-slate-600">{getCalcFacultyListForYear(data.year).length}</td>
                       <td className="px-8 py-4 text-center">
                         <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full font-black">
                           {calculateSFR(data)}
@@ -318,13 +815,38 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
       {/* Faculty Directory Section */}
       {activeTab === 'faculty' && (
         <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Year selector buttons for directory */}
+          <div className="bg-slate-100 p-1 rounded-2xl border border-slate-200 max-w-lg flex gap-1">
+            {[
+              { id: 'cay', label: 'CAY (2025-26)', count: cayFacultyList.length },
+              { id: 'caym1', label: 'CAYm1 (2024-25)', count: caym1FacultyList.length },
+              { id: 'caym2', label: 'CAYm2 (2023-24)', count: caym2FacultyList.length }
+            ].map(y => (
+              <button
+                key={y.id}
+                type="button"
+                onClick={() => setSelectedDirectoryYear(y.id as any)}
+                className={`flex-1 flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all cursor-pointer ${
+                  selectedDirectoryYear === y.id
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                }`}
+              >
+                <span className="text-[9px] font-black uppercase tracking-wider">{y.label}</span>
+                <span className={`text-[9px] font-bold ${selectedDirectoryYear === y.id ? 'text-blue-100' : 'text-slate-400'}`}>
+                  {y.count} Members
+                </span>
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex gap-3 w-full sm:w-auto">
               <div className="relative flex-grow sm:w-96 w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                 <input 
                   type="text" 
-                  placeholder="Search roster by name, degree, designation..." 
+                  placeholder="Search current roster by name, degree, designation..." 
                   className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-4 focus:ring-blue-50 outline-none transition-all"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -332,7 +854,7 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
               </div>
             </div>
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
-              Showing {filteredFaculty.length} of {facultyList.length} Faculty
+              Showing {filteredFaculty.length} of {activeFacultyList.length} Faculty ({selectedDirectoryYear.toUpperCase()})
             </div>
           </div>
 
@@ -447,7 +969,7 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
                 </div>
                 <div className="flex justify-between items-center px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl font-bold">
                   <span className="text-[10px] uppercase text-slate-400">Regular Faculty (F)</span>
-                  <span className="text-base font-black text-slate-800">{facultyList.length}</span>
+                  <span className="text-base font-black text-slate-800">{getCalcFacultyListForYear(data.year).length}</span>
                 </div>
                 <div className="pt-3 text-center border-t border-slate-50">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ratio (Students/Faculty)</p>
@@ -483,8 +1005,9 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-bold">
                   {NBA_DATA.map((data, idx) => {
-                    const phds = facultyList.filter(f => f.degree.toLowerCase().includes('ph.d') || f.degree.toLowerCase().includes('phd')).length;
-                    const masters = facultyList.filter(f => f.degree.toLowerCase().includes('m.tech') || f.degree.toLowerCase().includes('me') || f.degree.toLowerCase().includes('master')).length;
+                    const yearList = getCalcFacultyListForYear(data.year);
+                    const phds = yearList.filter(f => f.degree.toLowerCase().includes('ph.d') || f.degree.toLowerCase().includes('phd')).length;
+                    const masters = yearList.filter(f => f.degree.toLowerCase().includes('m.tech') || f.degree.toLowerCase().includes('me') || f.degree.toLowerCase().includes('master')).length;
                     return (
                       <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-5 text-left px-8 text-slate-900">{data.year}</td>
@@ -535,9 +1058,10 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
               <tbody className="divide-y divide-slate-100 font-bold border-t border-slate-100">
                 {NBA_DATA.map((data, idx) => {
                   const rf = data.students / 20;
-                  const profs = facultyList.filter(f => f.presentDesignation.toLowerCase().includes('prof') && !f.presentDesignation.toLowerCase().includes('assoc')).length;
-                  const assocProfs = facultyList.filter(f => f.presentDesignation.toLowerCase().includes('assoc')).length;
-                  const asstProfs = facultyList.filter(f => f.presentDesignation.toLowerCase().includes('asst')).length;
+                  const yearList = getCalcFacultyListForYear(data.year);
+                  const profs = yearList.filter(f => f.presentDesignation.toLowerCase().includes('prof') && !f.presentDesignation.toLowerCase().includes('assoc')).length;
+                  const assocProfs = yearList.filter(f => f.presentDesignation.toLowerCase().includes('assoc')).length;
+                  const asstProfs = yearList.filter(f => f.presentDesignation.toLowerCase().includes('asst')).length;
 
                   return (
                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
@@ -571,19 +1095,20 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-md">
-              <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest border-b pb-3">Tenure Spread Analysis</h4>
+              <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest border-b pb-3">Tenure Spread Analysis ({selectedDirectoryYear.toUpperCase()})</h4>
               <div className="space-y-4">
                 {['experienceA', 'experienceB', 'experienceC', 'experienceD'].map((key) => {
                   const latest = NBA_DATA[0];
                   const labels: any = { experienceA: '>= 5 Years', experienceB: '3-5 Years', experienceC: '1-3 Years', experienceD: '< 1 Year' };
                   const colors: any = { experienceA: 'bg-emerald-500', experienceB: 'bg-indigo-500', experienceC: 'bg-blue-500', experienceD: 'bg-slate-300' };
                   
-                  const count = key === 'experienceA' ? facultyList.filter(f => f.experience >= 5).length : 
-                               key === 'experienceB' ? facultyList.filter(f => f.experience >= 3 && f.experience < 5).length :
-                               key === 'experienceC' ? facultyList.filter(f => f.experience >= 1 && f.experience < 3).length :
-                               facultyList.filter(f => f.experience < 1).length;
+                  const activeList = getCalcFacultyList();
+                  const count = key === 'experienceA' ? activeList.filter(f => f.experience >= 5).length : 
+                               key === 'experienceB' ? activeList.filter(f => f.experience >= 3 && f.experience < 5).length :
+                               key === 'experienceC' ? activeList.filter(f => f.experience >= 1 && f.experience < 3).length :
+                               activeList.filter(f => f.experience < 1).length;
 
-                  const total = facultyList.length;
+                  const total = activeList.length;
                   const percentage = total > 0 ? (count / total * 100).toFixed(1) : "0.0";
                   
                   return (
@@ -615,7 +1140,7 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
                   {NBA_DATA.map((data, idx) => (
                     <tr key={idx} className="font-bold">
                       <td className="px-4 py-4 text-slate-800">{data.year}</td>
-                      <td className="px-4 py-4 text-center font-bold text-slate-600">{facultyList.length}</td>
+                      <td className="px-4 py-4 text-center font-bold text-slate-600">{getCalcFacultyListForYear(data.year).length}</td>
                       <td className="px-4 py-4 text-center text-emerald-600 font-extrabold text-base">{calculateRetention(data)}</td>
                     </tr>
                   ))}
