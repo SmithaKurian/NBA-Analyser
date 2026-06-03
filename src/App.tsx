@@ -28,6 +28,16 @@ import { CR4Module, RowData } from './components/CR4Module';
 import { CR5Module } from './components/CR5Module';
 import { HISTORICAL_DATA, ALL_ACADEMIC_YEARS } from './utils';
 import { FacultyEntry } from './data';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer 
+} from 'recharts';
 
 interface SubCriteria {
   id: string;
@@ -250,6 +260,7 @@ const CRITERIA_DATA: Criterion[] = [
 
 export default function App() {
   const [activeCriterion, setActiveCriterion] = useState(CRITERIA_DATA[0]);
+  const [viewMode, setViewMode] = useState<'overview' | 'criterion'>('overview');
   const [analyzedCriteria, setAnalyzedCriteria] = useState<Record<string, boolean>>({});
   const [criterionFiles, setCriterionFiles] = useState<Record<string, File>>({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -800,72 +811,114 @@ export default function App() {
 
         {/* Upload Section */}
         <div className="px-6 mb-8">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept=".pdf,.doc,.docx"
-          />
-          <div className="space-y-3">
-            <button 
-              onClick={triggerUpload}
-              className={`w-full p-4 border-2 border-dashed rounded-2xl flex flex-col items-center gap-2 transition-all group ${
-                criterionFiles[activeCriterion.id] ? "border-emerald-500/30 bg-emerald-500/5" : "border-slate-700 hover:border-blue-500/50 hover:bg-blue-500/5"
-              }`}
-            >
-              {criterionFiles[activeCriterion.id] ? (
-                <>
-                  <FileText className="w-5 h-5 text-emerald-500" />
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest truncate max-w-full italic px-2">
-                    {criterionFiles[activeCriterion.id].name}
-                  </span>
-                  <span className="text-[9px] text-emerald-500/60 transition-colors hover:text-emerald-500 underline">Change File</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-5 h-5 text-slate-500 group-hover:text-blue-500 transition-colors" />
-                  <span className="text-[10px] font-bold text-slate-500 group-hover:text-blue-500 transition-colors uppercase tracking-widest text-center">Upload SAR for {activeCriterion.id}</span>
-                  <span className="text-[9px] text-slate-600">PDF, DOCX supported</span>
-                </>
-              )}
-            </button>
+          {viewMode === 'overview' ? (
+            <div className="p-4 bg-slate-805 bg-slate-800/45 rounded-2xl border border-slate-800 text-center space-y-3 shadow-md">
+              <span className="block text-[9px] uppercase font-bold tracking-widest text-slate-500">Accreditation Progress</span>
+              <div className="relative inline-flex items-center justify-center">
+                <svg className="w-16 h-16 transform -rotate-90">
+                  <circle cx="32" cy="32" r="28" stroke="currentColor" className="text-slate-805 text-slate-800" strokeWidth="4" fill="transparent" />
+                  <circle cx="32" cy="32" r="28" stroke="currentColor" className="text-blue-500" strokeWidth="4" fill="transparent"
+                    strokeDasharray={175.9}
+                    strokeDashoffset={175.9 - (175.9 * programProgressPercent) / 100}
+                  />
+                </svg>
+                <span className="absolute text-xs font-black text-white">{programProgressPercent}%</span>
+              </div>
+              <p className="text-[10px] font-semibold text-slate-300">{totalProgramAwarded} / {totalProgramMax} Grand Marks</p>
+            </div>
+          ) : (
+            <>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+                accept=".pdf,.doc,.docx"
+              />
+              <div className="space-y-3">
+                <button 
+                  onClick={triggerUpload}
+                  className={`w-full p-4 border-2 border-dashed rounded-2xl flex flex-col items-center gap-2 transition-all group ${
+                    criterionFiles[activeCriterion.id] ? "border-emerald-500/30 bg-emerald-500/5" : "border-slate-700 hover:border-blue-500/50 hover:bg-blue-500/5"
+                  }`}
+                >
+                  {criterionFiles[activeCriterion.id] ? (
+                    <>
+                      <FileText className="w-5 h-5 text-emerald-500" />
+                      <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest truncate max-w-full italic px-2">
+                        {criterionFiles[activeCriterion.id].name}
+                      </span>
+                      <span className="text-[9px] text-emerald-500/60 transition-colors hover:text-emerald-500 underline">Change File</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-5 h-5 text-slate-500 group-hover:text-blue-500 transition-colors" />
+                      <span className="text-[10px] font-bold text-slate-500 group-hover:text-blue-500 transition-colors uppercase tracking-widest text-center">Upload SAR for {activeCriterion.id}</span>
+                      <span className="text-[9px] text-slate-600">PDF, DOCX supported</span>
+                    </>
+                  )}
+                </button>
 
-            {criterionFiles[activeCriterion.id] && !analyzedCriteria[activeCriterion.id] && (
-              <button 
-                onClick={handleAnalyse}
-                disabled={isAnalyzing}
-                className="w-full py-3 bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Analyzing...</span>
-                  </>
-                ) : (
-                  <>
-                    <TrendingUp className="w-4 h-4" />
-                    <span>Analyse {activeCriterion.id}</span>
-                  </>
+                {criterionFiles[activeCriterion.id] && !analyzedCriteria[activeCriterion.id] && (
+                  <button 
+                    onClick={handleAnalyse}
+                    disabled={isAnalyzing}
+                    className="w-full py-3 bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <TrendingUp className="w-4 h-4" />
+                        <span>Analyse {activeCriterion.id}</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         <nav className="flex-grow space-y-1 overflow-y-auto custom-scrollbar px-2">
+          {/* Executive Overview Tab */}
+          <button
+            onClick={() => setViewMode('overview')}
+            className={`w-full flex items-center px-4 py-3 mb-3 rounded-lg text-xs font-bold transition-all group ${
+              viewMode === 'overview'
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-inherit" />
+              <span className="font-extrabold uppercase tracking-widest">Executive Summary</span>
+            </div>
+            {viewMode === 'overview' && (
+              <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_8px_white]" />
+            )}
+          </button>
+
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-extrabold px-4 mb-2">Detailed Criteria</div>
+
           {allCriteria.map((c) => (
             <button
               key={c.id}
-              onClick={() => setActiveCriterion(c)}
+              onClick={() => {
+                setActiveCriterion(c);
+                setViewMode('criterion');
+              }}
               className={`w-full flex items-center px-4 py-3 rounded-lg text-xs font-medium transition-all group ${
-                activeCriterion.id === c.id
+                viewMode === 'criterion' && activeCriterion.id === c.id
                   ? "bg-slate-800 text-white shadow-lg"
                   : "text-slate-400 hover:text-white hover:bg-slate-800/50"
               }`}
             >
               <div className="flex flex-col items-start overflow-hidden text-left">
-                <span className={`truncate w-full ${activeCriterion.id === c.id ? "font-bold" : ""}`}>
+                <span className={`truncate w-full ${viewMode === 'criterion' && activeCriterion.id === c.id ? "font-bold" : ""}`}>
                   {c.id}: {c.name}
                 </span>
                 {analyzedCriteria[c.id] && (
@@ -875,7 +928,7 @@ export default function App() {
                   </span>
                 )}
               </div>
-              {activeCriterion.id === c.id && (
+              {viewMode === 'criterion' && activeCriterion.id === c.id && (
                 <div className="ml-auto w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
               )}
             </button>
@@ -893,43 +946,265 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-grow flex flex-col p-8 gap-6 overflow-hidden">
         {/* Header */}
-        <header className="flex justify-between items-end border-bottom border-slate-200 pb-5">
+        <header className="flex justify-between items-end border-b border-slate-200 pb-5">
           <div className="space-y-1">
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              Criterion {activeCriterion.id}: {activeCriterion.name}
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-[9px] uppercase tracking-widest font-black border border-blue-100">
-                Strict Guideline Mode
-              </span>
+              {viewMode === 'overview' ? (
+                <>
+                  Executive Summary Dashboard
+                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[9px] uppercase tracking-widest font-black border border-indigo-100">
+                    Accreditation Overview
+                  </span>
+                </>
+              ) : (
+                <>
+                  Criterion {activeCriterion.id}: {activeCriterion.name}
+                  <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-[9px] uppercase tracking-widest font-black border border-blue-100">
+                    Strict Guideline Mode
+                  </span>
+                </>
+              )}
             </h1>
             <div className="text-xs text-slate-500 font-medium flex flex-wrap items-center gap-2">
-              <span>Evaluation strictly limited to provided SAR content & NBA Registry Standards</span>
-              <span className="text-slate-300 hidden sm:inline">|</span>
-              <button
-                type="button"
-                onClick={() => setIsHistoryOpen(true)}
-                className="text-blue-600 hover:text-blue-800 font-extrabold hover:underline flex items-center gap-1 transition-colors cursor-pointer"
-              >
-                <TrendingUp size={12} className="text-blue-500" />
-                View Multi-Year Audit Trend Analysis
-              </button>
+              {viewMode === 'overview' ? (
+                <span>Aggregated marks, compliance ratios, and criteria-wise summary of marks for Tier-1 assessment</span>
+              ) : (
+                <>
+                  <span>Evaluation strictly limited to provided SAR content & NBA Registry Standards</span>
+                  <span className="text-slate-300 hidden sm:inline">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsHistoryOpen(true)}
+                    className="text-blue-600 hover:text-blue-800 font-extrabold hover:underline flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <TrendingUp size={12} className="text-blue-500" />
+                    View Multi-Year Audit Trend Analysis
+                  </button>
+                </>
+              )}
             </div>
           </div>
           
           <div className="flex gap-4">
             <div className="bg-white border border-slate-200 px-5 py-3 rounded-xl min-w-[140px] shadow-sm">
-              <span className="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Compliance Rate</span>
-              <span className="text-lg font-bold text-blue-500">{progressPercent}%</span>
+              <span className="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">
+                {viewMode === 'overview' ? "Overall Compliance" : "Compliance Rate"}
+              </span>
+              <span className="text-lg font-bold text-blue-500">
+                {viewMode === 'overview' ? programProgressPercent : progressPercent}%
+              </span>
             </div>
             <div className="bg-white border border-slate-200 px-5 py-3 rounded-xl min-w-[140px] shadow-sm">
-              <span className="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Strict Score</span>
+              <span className="block text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">
+                {viewMode === 'overview' ? "Strict Program Score" : "Strict Score"}
+              </span>
               <span className="text-lg font-bold text-slate-900">
-                {totalAwarded} <span className="text-slate-300 text-sm font-normal">/ {totalMax}</span>
+                {viewMode === 'overview' ? totalProgramAwarded : totalAwarded}{" "}
+                <span className="text-slate-300 text-sm font-normal">
+                  / {viewMode === 'overview' ? totalProgramMax : totalMax}
+                </span>
               </span>
             </div>
           </div>
         </header>
 
-        {activeCriterion.id === 'C4' && (
+        {viewMode === 'overview' ? (
+          /* Executive Dashboard View */
+          <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-6 min-h-0">
+            {/* KPI Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              
+              <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Grand Score</span>
+                  <div className="p-2 bg-blue-50 text-blue-500 rounded-lg">
+                    <Target className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-2xl font-black text-slate-900">
+                  {totalProgramAwarded} <span className="text-slate-400 text-sm font-normal">/ {totalProgramMax}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium mt-1">Total strict awarded marks</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Grand Compliance</span>
+                  <div className="p-2 bg-emerald-50 text-emerald-500 rounded-lg">
+                    <CheckCircle className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-2xl font-black text-emerald-600">
+                  {programProgressPercent}%
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium mt-1">Average alignment rating</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Criterions Audited</span>
+                  <div className="p-2 bg-amber-50 text-amber-500 rounded-lg">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-2xl font-black text-slate-900">
+                  {Object.keys(analyzedCriteria).filter(k => analyzedCriteria[k]).length}{" "}
+                  <span className="text-slate-400 text-sm font-normal">/ {allCriteria.length}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium mt-1">Detailed worksheet uploads</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Accreditation Tier</span>
+                  <div className="p-2 bg-indigo-50 text-indigo-500 rounded-lg">
+                    <GraduationCap className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl font-extrabold text-indigo-600 uppercase tracking-tight">
+                  Tier-1 National
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium mt-1">Highest assessment norm</p>
+              </div>
+
+            </div>
+
+            {/* Recharts Analytics Visualization */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Criterion-Wise Score Distribution</h3>
+                  <p className="text-[10px] text-slate-500">Comparing strict benchmark max marks against current awarded files scoring</p>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#3b82f6] bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                  Tier-1 Scale
+                </span>
+              </div>
+              <div className="w-full h-[260px] text-xs">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={allCriteria.map(c => {
+                      const cMax = c.subCriteria.reduce((sum, sc) => sum + sc.maxMarks, 0);
+                      const cAwarded = analyzedCriteria[c.id]
+                        ? c.subCriteria.reduce((sum, sc) => sum + sc.awardedMarks, 0)
+                        : 0;
+                      return {
+                        name: c.id,
+                        "Awarded Marks": cAwarded,
+                        "Max Marks": cMax,
+                      };
+                    })}
+                    margin={{ top: 10, right: 10, left: -20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} />
+                    <Tooltip 
+                      contentStyle={{ background: '#0f172a', color: '#fff', borderRadius: '12px', borderColor: '#334155', fontSize: '11px' }} 
+                      itemStyle={{ color: '#fff' }}
+                      cursor={{ fill: 'rgba(241, 245, 249, 0.5)' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '10px' }} iconType="circle" />
+                    <Bar dataKey="Awarded Marks" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={24} />
+                    <Bar dataKey="Max Marks" fill="#e2e8f0" radius={[4, 4, 0, 0]} barSize={24} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Criteria summary table */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Criteria Summary Ledger</h3>
+                  <p className="text-[10px] text-slate-500">Unified overview of marks, file statuses, and review progression</p>
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono">
+                  {Object.keys(analyzedCriteria).length} parsed
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[9px]">ID</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[9px] w-[35%]">Criterion Name</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[9px] text-center">Status</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[9px] text-center w-[25%] opacity-90">Compliance Rating</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[9px] text-center">Marks</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[9px] text-right text-right">Operation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-xs divide-y divide-slate-100">
+                    {allCriteria.map((c) => {
+                      const cMax = c.subCriteria.reduce((sum, sc) => sum + sc.maxMarks, 0);
+                      const cAwarded = analyzedCriteria[c.id]
+                        ? c.subCriteria.reduce((sum, sc) => sum + sc.awardedMarks, 0)
+                        : 0;
+                      const cPercent = cMax > 0 ? Math.round((cAwarded / cMax) * 100) : 0;
+                      const isAnalyzed = analyzedCriteria[c.id];
+
+                      return (
+                        <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="py-4 px-4 font-black text-slate-400 group-hover:text-blue-500 transition-colors">{c.id}</td>
+                          <td className="py-4 px-4 font-semibold text-slate-705 text-slate-700">
+                            {c.name}
+                          </td>
+                          <td className="py-4 px-4 text-center">
+                            <span className={`px-2 py-0.5 rounded font-black text-[9px] uppercase tracking-wider border ${
+                              isAnalyzed 
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                                : "bg-amber-50 text-amber-600 border-amber-100"
+                            }`}>
+                              {isAnalyzed ? "Analyzed" : "Pending Upload"}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex-grow bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isAnalyzed ? 'bg-blue-500' : 'bg-slate-300'
+                                  }`}
+                                  style={{ width: `${isAnalyzed ? cPercent : 0}%` }}
+                                />
+                              </div>
+                              <span className="font-extrabold text-[10px] font-mono text-slate-500 min-w-[28px] text-right">
+                                {isAnalyzed ? cPercent : 0}%
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 text-center font-bold text-slate-700">
+                            {isAnalyzed ? (
+                              <span className="text-blue-600 font-extrabold">{cAwarded}</span>
+                            ) : 0}{" "}
+                            <span className="text-slate-400 font-normal">/ {cMax}</span>
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            <button
+                              onClick={() => {
+                                {
+                                  setActiveCriterion(c);
+                                  setViewMode('criterion');
+                                }
+                              }}
+                              className="px-3 py-1 bg-slate-100 hover:bg-slate-900 hover:text-white transition-all text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-wider active:scale-95"
+                            >
+                              Open Worksheet
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {activeCriterion.id === 'C4' && (
           <div className="flex border-b border-slate-200 gap-6 mb-2 pb-1 shrink-0">
             <button
               type="button"
@@ -1211,6 +1486,8 @@ export default function App() {
             </div>
           )}
         </div>
+        )}
+          </>
         )}
       </main>
 
