@@ -940,7 +940,7 @@ export default function App() {
               }`}
             >
               <Calculator size={13} />
-              Interactive CR4(2) Calculator
+              Interactive CR4 Calculator
             </button>
           </div>
         )}

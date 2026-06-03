@@ -219,33 +219,61 @@ export function CR5Module({
             if (hasName && (hasDegree || hasExp)) {
               headerRowIndex = r;
               rowStr.forEach((val, cIdx) => {
-                if (val.includes('sn') || val.includes('s.n') || val === 'sno' || val === 's.no' || val === 'serial') {
+                const s = val.toLowerCase().trim();
+                // 1. Serial Number
+                if (s === 's.n' || s === 's.n.' || s === 'sn' || s === 'sno' || s === 's.no' || s === 'serial' || s === 'serial number' || s === 'sl.no' || s === 'sl no') {
                   colIdxs.sn = cIdx;
-                } else if (val.includes('date (designated') || val.includes('designated as prof') || (val.includes('designated') && val.includes('prof'))) {
-                  colIdxs.dateDesignatedProf = cIdx;
-                } else if (val.includes('name') || (val.includes('faculty') && !val.includes('designat') && !val.includes('joining') && !val.includes('leaving'))) {
+                }
+                // 2. Named Professor/Faculty
+                else if (s.includes('name') && !s.includes('designat') && !s.includes('join') && !s.includes('leav') && !s.includes('institution') && !s.includes('dept') && !s.includes('spec')) {
                   colIdxs.name = cIdx;
-                } else if (val.includes('pan')) {
+                }
+                // 3. PAN No.
+                else if (s.includes('pan')) {
                   colIdxs.pan = cIdx;
-                } else if (val.includes('degree') || val.includes('qualification') || val.includes('highest')) {
+                }
+                // 4. Highest Degree
+                else if (s.includes('degree') || s.includes('qualification') || s.includes('highest')) {
                   colIdxs.degree = cIdx;
-                } else if (val.includes('univ') || val.includes('college') || val.includes('institute')) {
+                }
+                // 5. University - MUST make sure it doesn't match 'experience' or 'designation' or 'joining'
+                else if ((s.includes('univ') || s.includes('college') || s.includes('institute') || s.includes('institution') || s.includes('institu')) && !s.includes('exp') && !s.includes('year') && !s.includes('joining') && !s.includes('leaving') && !s.includes('designat')) {
                   colIdxs.university = cIdx;
-                } else if (val.includes('spec') || val.includes('dept') || val.includes('branch') || val.includes('subject')) {
+                }
+                // 6. Area of Specialization
+                else if (s.includes('spec') || s.includes('dept') || s.includes('branch') || s.includes('subject') || s.includes('area')) {
                   colIdxs.specialization = cIdx;
-                } else if (val.includes('joining date') || val.includes('doj') || val.includes('date of joining')) {
+                }
+                // 7. Date of Joining in this Institution
+                else if ((s.includes('joining') || s.includes('doj')) && (s.includes('date') || s.includes('doj'))) {
                   colIdxs.joiningDate = cIdx;
-                } else if (val.includes('exp') || val.includes('year')) {
+                }
+                // 8. Experience in Years in current institute - very clean checks
+                else if ((s.includes('exp') || s.includes('year') || s.includes('tenure')) && !s.includes('date') && !s.includes('joining') && !s.includes('leaving') && !s.includes('designat') && !s.includes('academic')) {
                   colIdxs.experience = cIdx;
-                } else if (val.includes('joining des') || val.includes('designation at joining') || val.includes('designation at time joining')) {
+                }
+                // 9. Designation at Time Joining in this Institution
+                else if (s.includes('joining') && s.includes('designat')) {
                   colIdxs.joiningDesignation = cIdx;
-                } else if (val.includes('present des') || val.includes('current des') || val.includes('present designation') || val.includes('current designation') || val.includes('role') || val.includes('designation')) {
+                }
+                // 10. Present Designation
+                else if ((s.includes('present') && s.includes('designat')) || (s.includes('current') && s.includes('designat')) || s === 'designation' || (s.includes('designat') && !s.includes('joining') && !s.includes('designated as'))) {
                   colIdxs.presentDesignation = cIdx;
-                } else if (val.includes('nature') || val.includes('type') || val.includes('association') || val.includes('status')) {
+                }
+                // 11. Date (Designated as Prof./ Associate Professor)
+                else if (s.includes('designated') || s.includes('date (designated') || s.includes('designated as') || (s.includes('date') && s.includes('prof'))) {
+                  colIdxs.dateDesignatedProf = cIdx;
+                }
+                // 12. Nature of Association (Regular/Contract/Adjunct)
+                else if (s.includes('nature') || s.includes('association') || s.includes('association status')) {
                   colIdxs.nature = cIdx;
-                } else if (val.includes('currently') || val.includes('associated') || val.includes('active') || val.includes('yes/no') || val.includes('y/n')) {
+                }
+                // 13. Currently Associated
+                else if (s.includes('currently') || s.includes('associated') || s.includes('active') || s.includes('yes/no') || s.includes('y/n')) {
                   colIdxs.currentlyAssociated = cIdx;
-                } else if (val.includes('leaving') || val.includes('date of leaving')) {
+                }
+                // 14. Date of Leaving
+                else if (s.includes('leaving') || s.includes('date of leaving')) {
                   colIdxs.dateOfLeaving = cIdx;
                 }
               });
