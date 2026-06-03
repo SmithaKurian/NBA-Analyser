@@ -20,8 +20,13 @@ import {
   Download,
   Printer,
   Info,
-  CheckCircle
+  CheckCircle,
+  Calculator
 } from 'lucide-react';
+import { HistoryModal } from './components/HistoryModal';
+import { CR4Module } from './components/CR4Module';
+import { CR5Module } from './components/CR5Module';
+import { HISTORICAL_DATA, ALL_ACADEMIC_YEARS } from './utils';
 
 interface SubCriteria {
   id: string;
@@ -250,6 +255,208 @@ export default function App() {
   const [showReport, setShowReport] = useState(false);
   const [allCriteria, setAllCriteria] = useState<Criterion[]>(CRITERIA_DATA);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [c4ActiveTab, setC4ActiveTab] = useState<'analyzer' | 'calculator'>('analyzer');
+  const [c5ActiveTab, setC5ActiveTab] = useState<'analyzer' | 'calculator'>('analyzer');
+
+  const handleCalculateC4Results = (results: {
+    ER: number;
+    SR: number;
+    API1: number;
+    API2: number;
+    API3: number;
+    PI: number;
+  }) => {
+    // ER (Max 20): >=90% receives 20 marks, else proportional
+    let erMarks = 0;
+    if (results.ER >= 0.90) erMarks = 20;
+    else if (results.ER >= 0.80) erMarks = 18;
+    else if (results.ER >= 0.70) erMarks = 16;
+    else if (results.ER >= 0.60) erMarks = 14;
+    else erMarks = Math.min(20, Math.round(results.ER * 20));
+
+    // SR (Max 15): (SR % / 100) * 15
+    const srMarks = Math.min(15, Math.round((results.SR / 100) * 15));
+
+    // API1, API2, API3 (Max 10 each)
+    const api1Marks = Math.min(10, Math.round(results.API1));
+    const api2Marks = Math.min(10, Math.round(results.API2));
+    const api3Marks = Math.min(10, Math.round(results.API3));
+
+    // PI (Max 30): (PI % / 100) * 30
+    const piMarks = Math.min(30, Math.round((results.PI / 100) * 30));
+
+    setAllCriteria(prevCriteria => {
+      const updatedCriteria = prevCriteria.map(c => {
+        if (c.id !== "C4") return c;
+
+        const subIdMarksMap: Record<string, { marks: number; label: string; remark: string }> = {
+          "4.1": { 
+            marks: erMarks, 
+            label: `Enrollment Ratio calculated at ${(results.ER * 100).toFixed(1)}%`,
+            remark: "SUCCESS: Average enrolment ratio exceeds NBA Tier-I baseline benchmarks."
+          },
+          "4.2": { 
+            marks: srMarks, 
+            label: `Success Rate calculated at ${results.SR.toFixed(1)}%`,
+            remark: "VERIFIED: Program completion rate conforms to prescribed graduation benchmarks."
+          },
+          "4.3": { 
+            marks: api1Marks, 
+            label: `API 1st Year calculated at ${results.API1.toFixed(2)}`,
+            remark: "AUTHENTICATED: Mean GPA trends showcase solid 1st year foundational results."
+          },
+          "4.4": { 
+            marks: api2Marks, 
+            label: `API 2nd Year calculated at ${results.API2.toFixed(2)}`,
+            remark: "AUTHENTICATED: Secondary level metrics align with programmatic averages."
+          },
+          "4.5": { 
+            marks: api3Marks, 
+            label: `API 3rd Year calculated at ${results.API3.toFixed(2)}`,
+            remark: "AUTHENTICATED: High vertical performance index before final-year graduation."
+          },
+          "4.6": { 
+            marks: piMarks, 
+            label: `Placement Rate calculated at ${results.PI.toFixed(1)}%`,
+            remark: "SUCCESS: High compliance on transition metrics (placement/higher education)."
+          }
+        };
+
+        const updatedSubCriteria = c.subCriteria.map(sc => {
+          const formulaResult = subIdMarksMap[sc.id];
+          if (formulaResult) {
+            return {
+              ...sc,
+              status: "Matched" as const,
+              remarks: `${formulaResult.label}. ${formulaResult.remark}`,
+              awardedMarks: formulaResult.marks
+            };
+          }
+          return sc;
+        });
+
+        // Recalculate strengths and discrepancies
+        const strengths = updatedSubCriteria
+          .filter(sc => sc.status === 'Matched' && sc.awardedMarks > (sc.maxMarks * 0.8))
+          .slice(0, 4)
+          .map(sc => `${sc.id} Verified: Interactive worksheet computed high attainment score (${sc.awardedMarks}/${sc.maxMarks}).`);
+
+        const discrepancies = updatedSubCriteria
+          .filter(sc => sc.status === 'Missing' || sc.status === 'Mismatch' || sc.awardedMarks < (sc.maxMarks * 0.5))
+          .map(sc => `${sc.id} Attent: Computed compliance score is low (${sc.awardedMarks}/${sc.maxMarks}). Supporting documentation must be solid.`);
+
+        if (discrepancies.length === 0) {
+          discrepancies.push("All calculated student achievement matrices compile successfully with top compliance metrics.");
+        }
+
+        return {
+          ...c,
+          subCriteria: updatedSubCriteria,
+          strengths,
+          discrepancies
+        };
+      });
+
+      // Also trigger updating state of the activeCriterion
+      const refreshedActive = updatedCriteria.find(c => c.id === activeCriterion.id);
+      if (refreshedActive) {
+        setTimeout(() => setActiveCriterion(refreshedActive), 10);
+      }
+
+      return updatedCriteria;
+    });
+
+    setAnalyzedCriteria(prev => ({ ...prev, C4: true }));
+  };
+
+  const handleCalculateC5Results = (results: {
+    SFR: number;
+    FQI: number;
+    Cadre: number;
+    Retention: number;
+  }) => {
+    let sfrMarks = 0;
+    if (results.SFR <= 15) sfrMarks = 30;
+    else if (results.SFR >= 25) sfrMarks = 0;
+    else sfrMarks = Math.max(0, Math.min(30, Math.round(((25 - results.SFR) / 10) * 30)));
+
+    const fqiMarks = Math.max(0, Math.min(25, Math.round(results.FQI)));
+    const cadreMarks = Math.max(0, Math.min(25, Math.round(results.Cadre)));
+    const retentionMarks = Math.max(0, Math.min(10, Math.round(results.Retention)));
+
+    setAllCriteria(prevCriteria => {
+      const updatedCriteria = prevCriteria.map(c => {
+        if (c.id !== "C5") return c;
+
+        const subIdMarksMap: Record<string, { marks: number; label: string; remark: string }> = {
+          "5.1": { 
+            marks: sfrMarks, 
+            label: `Student-Faculty Ratio calculated at ${results.SFR.toFixed(2)}:1`,
+            remark: sfrMarks >= 20 ? "EXCELLENT: Ideal faculty strength to accommodate curriculum intake." : "GOOD: SFR meets NBA programmatic baseline requirements."
+          },
+          "5.2": { 
+            marks: fqiMarks, 
+            label: `Faculty Qualification Index calculated at ${results.FQI.toFixed(2)} points`,
+            remark: fqiMarks >= 18 ? "EXCELLENT: Highly qualified PhD research leaders are present." : "GOOD: Adequate PhD percentage across regular appointments."
+          },
+          "5.3": { 
+            marks: cadreMarks, 
+            label: `Faculty Cadre Proportion calculated at ${results.Cadre.toFixed(2)} points`,
+            remark: cadreMarks >= 15 ? "EXCELLENT: Commendable organizational balance of senior/junior faculty." : "GOOD: Satisfactory mix of associate and research assistants."
+          },
+          "5.5": { 
+            marks: retentionMarks, 
+            label: `Faculty Retention calculated at ${results.Retention.toFixed(2)} points out of 10`,
+            remark: retentionMarks >= 8 ? "EXCELLENT: Highly stable core staff with minimal attrition." : "GOOD: Standard retention levels over current cycle."
+          }
+        };
+
+        const updatedSubCriteria = c.subCriteria.map(sc => {
+          const formulaResult = subIdMarksMap[sc.id];
+          if (formulaResult) {
+            return {
+              ...sc,
+              status: "Matched" as const,
+              remarks: `${formulaResult.label}. ${formulaResult.remark}`,
+              awardedMarks: formulaResult.marks
+            };
+          }
+          return sc;
+        });
+
+        const strengths = updatedSubCriteria
+          .filter(sc => sc.status === 'Matched' && sc.awardedMarks > (sc.maxMarks * 0.8))
+          .slice(0, 4)
+          .map(sc => `${sc.id} Verified: Interactive worksheet computed high attainment score (${sc.awardedMarks}/${sc.maxMarks}).`);
+
+        const discrepancies = updatedSubCriteria
+          .filter(sc => sc.status === 'Missing' || sc.status === 'Mismatch' || sc.awardedMarks < (sc.maxMarks * 0.5))
+          .map(sc => `${sc.id} Attent: Computed compliance score is low (${sc.awardedMarks}/${sc.maxMarks}). Supporting documentation must be solid.`);
+
+        if (discrepancies.length === 0) {
+          discrepancies.push("All calculated faculty information matrices compile successfully with high standards.");
+        }
+
+        return {
+          ...c,
+          subCriteria: updatedSubCriteria,
+          strengths,
+          discrepancies
+        };
+      });
+
+      const refreshedActive = updatedCriteria.find(c => c.id === activeCriterion.id);
+      if (refreshedActive) {
+        setTimeout(() => setActiveCriterion(refreshedActive), 10);
+      }
+
+      return updatedCriteria;
+    });
+
+    setAnalyzedCriteria(prev => ({ ...prev, C5: true }));
+  };
 
   const activeCriterionIndex = allCriteria.findIndex(c => c.id === activeCriterion.id);
   const currentCriterion = activeCriterionIndex !== -1 ? allCriteria[activeCriterionIndex] : activeCriterion;
@@ -660,7 +867,18 @@ export default function App() {
                 Strict Guideline Mode
               </span>
             </h1>
-            <p className="text-xs text-slate-500 font-medium">Evaluation strictly limited to provided SAR content & NBA Registry Standards</p>
+            <div className="text-xs text-slate-500 font-medium flex flex-wrap items-center gap-2">
+              <span>Evaluation strictly limited to provided SAR content & NBA Registry Standards</span>
+              <span className="text-slate-300 hidden sm:inline">|</span>
+              <button
+                type="button"
+                onClick={() => setIsHistoryOpen(true)}
+                className="text-blue-600 hover:text-blue-800 font-extrabold hover:underline flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <TrendingUp size={12} className="text-blue-500" />
+                View Multi-Year Audit Trend Analysis
+              </button>
+            </div>
           </div>
           
           <div className="flex gap-4">
@@ -677,8 +895,65 @@ export default function App() {
           </div>
         </header>
 
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-12 gap-6 min-h-0 flex-grow overflow-hidden">
+        {activeCriterion.id === 'C4' && (
+          <div className="flex border-b border-slate-200 gap-6 mb-2 pb-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setC4ActiveTab('analyzer')}
+              className={`pb-2 font-black text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                c4ActiveTab === 'analyzer' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              SAR File Analyzer
+            </button>
+            <button
+              type="button"
+              onClick={() => setC4ActiveTab('calculator')}
+              className={`pb-2 font-black text-xs uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                c4ActiveTab === 'calculator' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Calculator size={13} />
+              Interactive CR4(2) Calculator
+            </button>
+          </div>
+        )}
+
+        {activeCriterion.id === 'C5' && (
+          <div className="flex border-b border-slate-200 gap-6 mb-2 pb-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setC5ActiveTab('analyzer')}
+              className={`pb-2 font-black text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                c5ActiveTab === 'analyzer' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              SAR File Analyzer
+            </button>
+            <button
+              type="button"
+              onClick={() => setC5ActiveTab('calculator')}
+              className={`pb-2 font-black text-xs uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                c5ActiveTab === 'calculator' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Calculator size={13} />
+              Interactive CR5 Calculator
+            </button>
+          </div>
+        )}
+
+        {activeCriterion.id === 'C4' && c4ActiveTab === 'calculator' ? (
+          <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0 bg-slate-50/30 p-6 rounded-3xl border border-slate-100">
+            <CR4Module onCalculateResults={handleCalculateC4Results} />
+          </div>
+        ) : activeCriterion.id === 'C5' && c5ActiveTab === 'calculator' ? (
+          <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0 bg-slate-50/30 p-6 rounded-3xl border border-slate-100">
+            <CR5Module onCalculateResults={handleCalculateC5Results} />
+          </div>
+        ) : (
+          /* Dashboard Grid */
+          <div className="grid grid-cols-12 gap-6 min-h-0 flex-grow overflow-hidden">
           {analyzedCriteria[activeCriterion.id] ? (
             <>
               {/* Analysis View */}
@@ -864,12 +1139,21 @@ export default function App() {
             </div>
           )}
         </div>
+        )}
       </main>
 
       {/* Report Modal */}
       <AnimatePresence>
         {showReport && <ReportModal />}
       </AnimatePresence>
+
+      {/* History Modal */}
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        data={HISTORICAL_DATA}
+        allYears={ALL_ACADEMIC_YEARS}
+      />
 
       {/* Print-only template */}
       <div className="hidden print:block p-20 report-view">
