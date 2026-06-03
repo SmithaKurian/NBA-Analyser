@@ -376,7 +376,7 @@ export default function App() {
     FQI: number;
     Cadre: number;
     Retention: number;
-  }) => {
+  }, hasFaculty: boolean = true) => {
     let sfrMarks = 0;
     if (results.SFR <= 15) sfrMarks = 30;
     else if (results.SFR >= 25) sfrMarks = 0;
@@ -415,7 +415,7 @@ export default function App() {
 
         const updatedSubCriteria = c.subCriteria.map(sc => {
           const formulaResult = subIdMarksMap[sc.id];
-          if (formulaResult) {
+          if (formulaResult && hasFaculty) {
             return {
               ...sc,
               status: "Matched" as const,
@@ -423,19 +423,28 @@ export default function App() {
               awardedMarks: formulaResult.marks
             };
           }
-          return sc;
+          return {
+            ...sc,
+            status: undefined,
+            remarks: undefined,
+            awardedMarks: 0
+          };
         });
 
-        const strengths = updatedSubCriteria
-          .filter(sc => sc.status === 'Matched' && sc.awardedMarks > (sc.maxMarks * 0.8))
-          .slice(0, 4)
-          .map(sc => `${sc.id} Verified: Interactive worksheet computed high attainment score (${sc.awardedMarks}/${sc.maxMarks}).`);
+        const strengths = hasFaculty
+          ? updatedSubCriteria
+              .filter(sc => sc.status === 'Matched' && sc.awardedMarks > (sc.maxMarks * 0.8))
+              .slice(0, 4)
+              .map(sc => `${sc.id} Verified: Interactive worksheet computed high attainment score (${sc.awardedMarks}/${sc.maxMarks}).`)
+          : [];
 
-        const discrepancies = updatedSubCriteria
-          .filter(sc => sc.status === 'Missing' || sc.status === 'Mismatch' || sc.awardedMarks < (sc.maxMarks * 0.5))
-          .map(sc => `${sc.id} Attent: Computed compliance score is low (${sc.awardedMarks}/${sc.maxMarks}). Supporting documentation must be solid.`);
+        const discrepancies = hasFaculty
+          ? updatedSubCriteria
+              .filter(sc => sc.status === 'Missing' || sc.status === 'Mismatch' || sc.awardedMarks < (sc.maxMarks * 0.5))
+              .map(sc => `${sc.id} Attent: Computed compliance score is low (${sc.awardedMarks}/${sc.maxMarks}). Supporting documentation must be solid.`)
+          : [];
 
-        if (discrepancies.length === 0) {
+        if (hasFaculty && discrepancies.length === 0) {
           discrepancies.push("All calculated faculty information matrices compile successfully with high standards.");
         }
 
@@ -455,7 +464,7 @@ export default function App() {
       return updatedCriteria;
     });
 
-    setAnalyzedCriteria(prev => ({ ...prev, C5: true }));
+    setAnalyzedCriteria(prev => ({ ...prev, C5: hasFaculty }));
   };
 
   const activeCriterionIndex = allCriteria.findIndex(c => c.id === activeCriterion.id);
@@ -1151,8 +1160,8 @@ export default function App() {
       <HistoryModal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
-        data={HISTORICAL_DATA}
-        allYears={ALL_ACADEMIC_YEARS}
+        criterionId={activeCriterion.id}
+        criterionName={activeCriterion.name}
       />
 
       {/* Print-only template */}

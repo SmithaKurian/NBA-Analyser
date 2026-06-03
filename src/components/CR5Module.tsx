@@ -31,7 +31,7 @@ interface CR5ModuleProps {
     FQI: number;
     Cadre: number;
     Retention: number;
-  }) => void;
+  }, hasFaculty?: boolean) => void;
 }
 
 const StatCard = ({ title, value, label, subtitle, color }: { title: string, value: string, label: string, subtitle?: string, color: string }) => (
@@ -193,9 +193,9 @@ export function CR5Module({ onCalculateResults }: CR5ModuleProps) {
         FQI: parseFloat(averageFQI),
         Cadre: parseFloat(averageCadre),
         Retention: parseFloat(averageRetention)
-      });
+      }, facultyList.length > 0);
     }
-  }, [averageSFR, averageFQI, averageCadre, averageRetention]);
+  }, [averageSFR, averageFQI, averageCadre, averageRetention, facultyList.length]);
 
   return (
     <div className="space-y-8 pb-12">
